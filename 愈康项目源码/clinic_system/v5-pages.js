@@ -3,7 +3,9 @@
     'use strict';
 
     const API_ROOT = (() => {
-        const saved = (localStorage.getItem('clinic_server_url') || window.location.origin).replace(/\/+$/, '');
+        const currentOrigin = /^https?:$/.test(window.location.protocol) ? window.location.origin : '';
+        const saved = (currentOrigin || localStorage.getItem('clinic_server_url') || 'http://localhost:3002').replace(/\/+$/, '');
+        if (currentOrigin) localStorage.setItem('clinic_server_url', currentOrigin);
         return saved + '/api';
     })();
     const TOKEN_KEY = 'clinic_token';
@@ -106,7 +108,8 @@
                     <div class="v5-summary-card danger"><div class="v5-summary-label">待收费</div><div class="v5-summary-value" id="v5BillingPending">0</div><div class="v5-summary-note">尚未计入营收</div></div>
                     <div class="v5-summary-card gold"><div class="v5-summary-label">待收金额</div><div class="v5-summary-value" id="v5BillingPendingAmount">¥0.00</div><div class="v5-summary-note">支付后自动清零</div></div>
                     <div class="v5-summary-card"><div class="v5-summary-label">已收费</div><div class="v5-summary-value" id="v5BillingPaid">0</div><div class="v5-summary-note">已完成收费单</div></div>
-                    <div class="v5-summary-card"><div class="v5-summary-label">已收金额</div><div class="v5-summary-value" id="v5BillingPaidAmount">¥0.00</div><div class="v5-summary-note">仅统计已支付单据</div></div>
+                    <div class="v5-summary-card"><div class="v5-summary-label">已收金额</div><div class="v5-summary-value" id="v5BillingPaidAmount">¥0.00</div><div class="v5-summary-note">按实际收费金额统计</div></div>
+                    <div class="v5-summary-card gold"><div class="v5-summary-label">累计优惠</div><div class="v5-summary-value" id="v5BillingDiscountAmount">¥0.00</div><div class="v5-summary-note">标准应收减实际收费</div></div>
                 </div>
                 <div class="v5-panel">
                     <div class="v5-panel-head">
@@ -127,7 +130,7 @@
                     </div>
                     <div class="v5-table-wrap">
                         <table class="v5-table">
-                            <thead><tr><th>患者</th><th>收费单号</th><th>应收金额</th><th>创建时间</th><th>状态</th><th>打印次数</th><th>操作</th></tr></thead>
+                            <thead><tr><th>患者</th><th>收费单号</th><th>金额 / 实收</th><th>创建时间</th><th>状态</th><th>打印次数</th><th>操作</th></tr></thead>
                             <tbody id="v5BillingBody"><tr><td colspan="7" class="v5-empty"><i class="fas fa-receipt"></i>正在加载收费记录...</td></tr></tbody>
                         </table>
                     </div>
@@ -181,8 +184,16 @@
             card.innerHTML = `
                 <div class="v5-panel-head">
                     <div><div class="section-title" style="margin-bottom:3px;">图形化备份与恢复</div><small style="color:var(--text-faint);">创建数据库快照、查看备份记录，并可在误操作后恢复。恢复前会自动生成 pre-restore 快照。</small></div>
-                    <div class="v5-toolbar"><button class="v5-btn" id="v5RefreshBackups"><i class="fas fa-rotate"></i> 刷新</button><button class="v5-btn primary" id="v5CreateBackup"><i class="fas fa-cloud-arrow-up"></i> 立即备份</button></div>
+                    <div class="v5-toolbar">
+                        <button class="v5-btn" id="v5ExportJson"><i class="fas fa-file-export"></i> 导出完整数据</button>
+                        <button class="v5-btn" id="v5ImportJson"><i class="fas fa-file-import"></i> 导入/换机恢复</button>
+                        <button class="v5-btn" id="v5ExportHtml"><i class="fas fa-print"></i> 导出报表</button>
+                        <button class="v5-btn" id="v5RefreshBackups"><i class="fas fa-rotate"></i> 刷新</button>
+                        <button class="v5-btn primary" id="v5CreateBackup"><i class="fas fa-cloud-arrow-up"></i> 立即备份</button>
+                        <input type="file" id="v5ImportJsonFile" accept=".json,application/json" hidden>
+                    </div>
                 </div>
+                <div class="v5-warning"><b>换机迁移请使用“导出完整数据”。</b> SQLite 数据库与 Windows DPAPI 设备密钥绑定，不能把 clinic_database 文件夹直接复制到另一台电脑；JSON 导出/导入是官方迁移方式。</div>
                 <div class="v5-backup-list" id="v5BackupList"><div class="v5-empty"><i class="fas fa-database"></i>正在加载备份记录...</div></div>
                 <div class="v5-warning"><b>恢复会覆盖当前全部诊所数据。</b> 恢复成功后需要重新登录；系统会保留恢复前快照，便于再次回退。</div>`;
             settingsPage.appendChild(card);
@@ -196,10 +207,13 @@
                 <div class="v5-modal-card" role="dialog" aria-modal="true" aria-labelledby="v5PaymentTitle">
                     <div class="v5-modal-head"><div><h3 id="v5PaymentTitle">确认收费</h3><p id="v5PaymentBillNo">-</p></div><button class="v5-modal-close" data-v5-close="modalV5Payment" aria-label="关闭">&times;</button></div>
                     <div class="v5-modal-body">
-                        <div class="v5-payment-total"><span>应收金额</span><strong id="v5PaymentAmount">¥0.00</strong></div>
+                        <div class="v5-payment-total"><span>药品标准应收</span><strong id="v5PaymentAmount">¥0.00</strong></div>
                         <div class="v5-form-grid">
                             <div class="v5-field"><label for="v5PayMethod">支付方式</label><select class="v5-select" id="v5PayMethod"></select></div>
-                            <div class="v5-field"><label for="v5ReceivedAmount">实收金额</label><input class="v5-input" id="v5ReceivedAmount" type="number" min="0" step="0.01"></div>
+                            <div class="v5-field"><label for="v5ActualAmount">实际收费金额（可优惠）</label><input class="v5-input" id="v5ActualAmount" type="number" min="0" step="0.01"></div>
+                            <div class="v5-field"><label for="v5ReceivedAmount">顾客付款 / 到账金额</label><input class="v5-input" id="v5ReceivedAmount" type="number" min="0" step="0.01"></div>
+                            <div class="v5-field"><label>优惠 / 调整</label><div class="v5-change" id="v5Adjustment">未调整</div></div>
+                            <div class="v5-field full"><label for="v5AdjustmentReason">优惠 / 调整原因</label><input class="v5-input" id="v5AdjustmentReason" maxlength="200" placeholder="如：老患者优惠、抹零、活动价"></div>
                             <div class="v5-field full"><div class="v5-change" id="v5ChangeAmount">找零：¥0.00</div></div>
                         </div>
                         <div class="v5-error" id="v5PaymentError"></div>
@@ -278,11 +292,13 @@
         const pending = billingData.filter(item => item.status === 'pending');
         const paid = billingData.filter(item => item.status === 'paid');
         const pendingAmount = pending.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-        const paidAmount = paid.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const paidAmount = paid.reduce((sum, item) => sum + (Number(item.actualAmount ?? item.amount) || 0), 0);
+        const discountAmount = paid.reduce((sum, item) => sum + (Number(item.discountAmount) || 0), 0);
         if ($('v5BillingPending')) $('v5BillingPending').textContent = pending.length;
         if ($('v5BillingPendingAmount')) $('v5BillingPendingAmount').textContent = money(pendingAmount);
         if ($('v5BillingPaid')) $('v5BillingPaid').textContent = paid.length;
         if ($('v5BillingPaidAmount')) $('v5BillingPaidAmount').textContent = money(paidAmount);
+        if ($('v5BillingDiscountAmount')) $('v5BillingDiscountAmount').textContent = money(discountAmount);
         document.querySelectorAll('[data-billing-filter]').forEach(button => button.classList.toggle('active', button.dataset.billingFilter === billingFilter));
 
         const body = $('v5BillingBody');
@@ -293,6 +309,13 @@
             return;
         }
         body.innerHTML = rows.map(item => {
+            const originalAmount = Number(item.amount) || 0;
+            const actualAmount = item.status === 'paid'
+                ? Number(item.actualAmount ?? item.amount) || 0
+                : originalAmount;
+            const itemDiscount = item.status === 'paid'
+                ? Number(item.discountAmount) || Math.max(0, originalAmount - actualAmount)
+                : 0;
             const actions = item.status === 'pending'
                 ? `<button class="v5-btn primary small" data-billing-action="pay" data-id="${escapeHtml(item.id)}"><i class="fas fa-money-bill-wave"></i> 收费</button>`
                 : `<button class="v5-btn small" data-billing-action="print" data-format="a4" data-id="${escapeHtml(item.id)}">A4 打印</button>
@@ -301,7 +324,7 @@
             return `<tr>
                 <td><b>${escapeHtml(item.patientName || '-')}</b>${item.outpatientId ? `<div class="v5-muted">门诊 ${escapeHtml(item.outpatientId)}</div>` : ''}</td>
                 <td>${escapeHtml(item.billNo || '-')}</td>
-                <td class="v5-money">${money(item.amount)}</td>
+                <td class="v5-money">${money(actualAmount)}${item.status === 'pending' ? '<div class="v5-muted">待收</div>' : ''}${itemDiscount > 0 ? `<div class="v5-muted">原价 ${money(originalAmount)} · 优惠 ${money(itemDiscount)}</div>` : ''}</td>
                 <td>${escapeHtml(formatDate(item.createdAt))}</td>
                 <td><span class="v5-status ${item.status === 'paid' ? 'paid' : 'pending'}">${billingStatusText(item.status)}</span></td>
                 <td>${Number(item.printCount) || 0}</td>
@@ -326,24 +349,37 @@
     }
 
     function updateChangeAmount() {
-        const amount = Number(currentBill && currentBill.amount) || 0;
+        const originalAmount = Number(currentBill && currentBill.amount) || 0;
+        const actual = Number($('v5ActualAmount') && $('v5ActualAmount').value);
         const received = Number($('v5ReceivedAmount') && $('v5ReceivedAmount').value);
-        const change = Number.isFinite(received) ? received - amount : 0;
+        const hasActual = Number.isFinite(actual);
+        const adjustment = hasActual ? actual - originalAmount : 0;
+        const change = hasActual && Number.isFinite(received) ? received - actual : 0;
+
+        const adjustmentEl = $('v5Adjustment');
+        if (adjustmentEl) {
+            if (!hasActual || Math.abs(adjustment) < 0.005) adjustmentEl.textContent = '未调整';
+            else if (adjustment < 0) adjustmentEl.textContent = `优惠：${money(-adjustment)}`;
+            else adjustmentEl.textContent = `加收：${money(adjustment)}`;
+        }
         if ($('v5ChangeAmount')) $('v5ChangeAmount').textContent = `找零：${money(Math.max(0, change))}`;
     }
 
     function openPayment(id) {
         currentBill = billingData.find(item => String(item.id) === String(id));
         if (!currentBill || currentBill.status !== 'pending') return notify('该收费单状态已变化，请刷新后重试', 'error');
+        const amount = Number(currentBill.amount) || 0;
         $('v5PaymentBillNo').textContent = currentBill.billNo || '-';
-        $('v5PaymentAmount').textContent = money(currentBill.amount);
+        $('v5PaymentAmount').textContent = money(amount);
         $('v5PayMethod').innerHTML = billingMethods.map(method => `<option value="${escapeHtml(method)}">${escapeHtml(method)}</option>`).join('');
-        $('v5ReceivedAmount').value = Number(currentBill.amount).toFixed(2);
+        $('v5ActualAmount').value = amount.toFixed(2);
+        $('v5ReceivedAmount').value = amount.toFixed(2);
+        $('v5AdjustmentReason').value = '';
         $('v5PaymentError').textContent = '';
         updateChangeAmount();
         $('modalV5Payment').classList.add('show');
         document.body.style.overflow = 'hidden';
-        setTimeout(() => $('v5PayMethod') && $('v5PayMethod').focus(), 50);
+        setTimeout(() => $('v5ActualAmount') && $('v5ActualAmount').focus(), 50);
     }
 
     function closeModal(id) {
@@ -354,11 +390,16 @@
 
     async function submitPayment() {
         if (!currentBill) return;
-        const amount = Number(currentBill.amount) || 0;
+        const actualAmount = Number($('v5ActualAmount').value);
         const receivedAmount = Number($('v5ReceivedAmount').value);
         const payMethod = $('v5PayMethod').value;
-        if (!Number.isFinite(receivedAmount) || receivedAmount < amount) {
-            $('v5PaymentError').textContent = `实收金额不能小于 ${money(amount)}`;
+        const adjustmentReason = $('v5AdjustmentReason').value.trim();
+        if (!Number.isFinite(actualAmount) || actualAmount < 0) {
+            $('v5PaymentError').textContent = '请输入有效的实际收费金额';
+            return;
+        }
+        if (!Number.isFinite(receivedAmount) || receivedAmount < actualAmount) {
+            $('v5PaymentError').textContent = `顾客付款金额不能小于实际收费 ${money(actualAmount)}`;
             return;
         }
         const button = $('v5SubmitPayment');
@@ -368,7 +409,7 @@
             await api(`/billing/${encodeURIComponent(currentBill.id)}/pay`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payMethod, receivedAmount })
+                body: JSON.stringify({ payMethod, actualAmount, receivedAmount, adjustmentReason })
             });
             notify('收费成功，营收已入账');
             closeModal('modalV5Payment');
@@ -392,6 +433,9 @@
         const pageSize = compact ? '80mm auto' : 'A4';
         const title = compact ? '门诊收费小票' : '门诊收费单';
         const clinicName = profile.clinicName || '愈康云诊所';
+        const originalAmount = Number(bill.originalAmount ?? bill.amount) || 0;
+        const actualAmount = Number(bill.actualAmount ?? bill.amount) || 0;
+        const discountAmount = Number(bill.discountAmount) || Math.max(0, originalAmount - actualAmount);
         const printHistory = Array.isArray(bill.printHistory) ? bill.printHistory : [];
         const historyText = printHistory.length > 1 ? `第 ${printHistory.length} 次打印（补打）` : `第 ${printHistory.length || 1} 次打印`;
         const itemTable = compact
@@ -429,9 +473,11 @@
                 <div><b>支付方式</b><span>${escapeHtml(bill.payMethod || '-')}</span></div>
             </div>
             ${itemTable}
-            <div class="total"><span>应收金额</span><strong>${money(bill.amount)}</strong></div>
+            <div class="total"><span>实际收费</span><strong>${money(actualAmount)}</strong></div>
             <div class="footer">
-                <div class="row"><span>实收：${money(bill.receivedAmount)}</span><span>找零：${money(bill.changeAmount)}</span></div>
+                <div class="row"><span>标准应收：${money(originalAmount)}</span><span>优惠减免：${money(discountAmount)}</span></div>
+                <div class="row"><span>顾客付款：${money(bill.receivedAmount)}</span><span>找零：${money(bill.changeAmount)}</span></div>
+                ${bill.adjustmentReason ? `<div class="row"><span>调整原因：${escapeHtml(bill.adjustmentReason)}</span></div>` : ''}
                 <div class="row"><span>打印操作员：${escapeHtml(bill.lastPrintedBy || profile.username || '-')}</span><span>打印时间：${escapeHtml(formatDate(bill.lastPrintedAt))}</span></div>
             </div>
             <div class="sign"><span>收费员：_____________</span><span>患者签字：_____________</span></div>
@@ -512,6 +558,77 @@
             if (error.message !== '登录已过期') notify(error.message, 'error');
         } finally {
             if (button) { button.disabled = false; button.innerHTML = '<i class="fas fa-key"></i> 生成邀请码'; }
+        }
+    }
+
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function downloadApiFile(path, filename) {
+        const response = await fetch(API_ROOT + path, { headers: { 'x-auth-token': token() } });
+        if (response.status === 401) {
+            localStorage.removeItem('clinic_user');
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(PROFILE_KEY);
+            window.location.href = 'login.html';
+            throw new Error('登录已过期');
+        }
+        if (!response.ok) {
+            let message = `导出失败（${response.status}）`;
+            try {
+                const payload = await response.json();
+                if (payload && payload.error) message = payload.error;
+            } catch (_) {}
+            throw new Error(message);
+        }
+        downloadBlob(await response.blob(), filename);
+    }
+
+    async function exportJsonArchive() {
+        try {
+            await downloadApiFile('/system/export/json', `yukang-完整数据-${new Date().toISOString().slice(0, 10)}.json`);
+            notify('完整数据已导出，请妥善保管');
+        } catch (error) {
+            if (error.message !== '登录已过期') notify(error.message, 'error');
+        }
+    }
+
+    async function exportHtmlArchive() {
+        try {
+            await downloadApiFile('/system/export/html', `yukang-数据报表-${new Date().toISOString().slice(0, 10)}.html`);
+            notify('数据报表已导出');
+        } catch (error) {
+            if (error.message !== '登录已过期') notify(error.message, 'error');
+        }
+    }
+
+    async function importJsonArchive(file) {
+        if (!file) return;
+        try {
+            const archive = JSON.parse(await file.text());
+            if (!archive || archive.format !== 'yukang-clinic-export') throw new Error('不是愈康完整数据导出文件');
+            const confirmation = window.prompt('导入会覆盖当前账号的业务数据，且无法自动撤销。请输入 IMPORT 确认：', '');
+            if (confirmation !== 'IMPORT') {
+                notify('已取消导入');
+                return;
+            }
+            await api('/system/import/json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmation, archive })
+            });
+            alert('数据导入成功。页面将刷新并重新加载数据。');
+            window.location.reload();
+        } catch (error) {
+            if (error.message !== '登录已过期') notify(error.message, 'error');
         }
     }
 
@@ -624,6 +741,12 @@
             if (event.target.closest('#v5CreateInvite')) createInvite();
             if (event.target.closest('#v5RefreshBackups')) loadBackups();
             if (event.target.closest('#v5CreateBackup')) createBackup();
+            if (event.target.closest('#v5ExportJson')) exportJsonArchive();
+            if (event.target.closest('#v5ExportHtml')) exportHtmlArchive();
+            if (event.target.closest('#v5ImportJson')) {
+                const input = $('v5ImportJsonFile');
+                if (input) input.click();
+            }
             if (event.target.closest('#v5CopyInvite')) {
                 const code = $('v5InviteCode').textContent;
                 navigator.clipboard.writeText(code).then(() => notify('邀请码已复制')).catch(() => notify('复制失败，请手动选择邀请码', 'error'));
@@ -632,6 +755,8 @@
 
         const keyword = $('v5BillingKeyword');
         if (keyword) keyword.addEventListener('input', () => { billingKeyword = keyword.value || ''; renderBilling(); });
+        const actualAmount = $('v5ActualAmount');
+        if (actualAmount) actualAmount.addEventListener('input', updateChangeAmount);
         const received = $('v5ReceivedAmount');
         if (received) received.addEventListener('input', updateChangeAmount);
         const payMethod = $('v5PayMethod');
@@ -642,6 +767,12 @@
         if (restoreButton) restoreButton.addEventListener('click', submitRestore);
         const restoreInput = $('v5RestoreInput');
         if (restoreInput) restoreInput.addEventListener('keydown', event => { if (event.key === 'Enter') submitRestore(); });
+        const importInput = $('v5ImportJsonFile');
+        if (importInput) importInput.addEventListener('change', async event => {
+            const file = event.target.files && event.target.files[0];
+            event.target.value = '';
+            await importJsonArchive(file);
+        });
         document.addEventListener('keydown', event => {
             if (event.key !== 'Escape') return;
             if ($('modalV5Payment').classList.contains('show')) closeModal('modalV5Payment');
@@ -667,6 +798,9 @@
         loadBilling,
         loadClinics,
         loadBackups,
+        exportJsonArchive,
+        exportHtmlArchive,
+        importJsonArchive,
         openPayment
     };
 

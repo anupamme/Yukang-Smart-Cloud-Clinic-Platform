@@ -1,19 +1,22 @@
 {
-    "name": "clinic_system",
-    "version": "5.0.0",
-    "description": "愈康项目 v5.0 本地化智慧诊所管理系统",
-    "main": "server.js",
-    "scripts": {
-        "start": "node --disable-warning=ExperimentalWarning server.js",
-        "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js",
-        "build:index": "node tools/build_hybrid_index.js",
-        "build:knowledge": "node tools/build_knowledge_package.js"
-    },
-    "engines": {
-        "node": ">=22.5.0"
-    },
-    "dependencies": {
-        "express": "^4.18.2",
-        "cors": "^2.8.5"
-    }
+  "name": "clinic_system",
+  "version": "5.1.0",
+  "description": "愈康云诊所 v5.1 商业化离线单机版",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js",
+    "build:index": "node tools/build_hybrid_index.js",
+    "build:knowledge": "node tools/build_knowledge_package.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "qrcode": "^1.5.4",
+    "xlsx": "^0.18.5",
+    "@fortawesome/fontawesome-free": "^6.7.2"
+  }
 }

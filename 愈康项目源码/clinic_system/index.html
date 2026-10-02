@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>愈康云诊所</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <script src="/vendor/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #5cb79f; --bg-color: #f0f4f4; --white: #ffffff; --text-sub: #666; --danger-text: #d32f2f; --danger-bg: #fce8ec; --warn-bg: #fff4e6; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
@@ -81,8 +81,11 @@
         .clinic-left .filter-tabs span { flex: 1; text-align: center; padding: 4px; border-radius: 12px; cursor: pointer; font-size: 12px; color: #5f6d66; background: #f0f4f4; }
         .clinic-left .filter-tabs span.active { background: var(--primary); color: white; }
         .clinic-left .filter-tabs span.active:hover { color: #fff; }
-        .patient-item { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 12px; }
+        .patient-item { position: relative; padding: 8px 38px 8px 8px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 12px; }
         .patient-item:hover, .patient-item.active { background: #e2f5ef; border-radius: 4px; }
+        .patient-item .patient-delete-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; border: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #df4b4b; color: #fff; cursor: pointer; box-shadow: 0 2px 7px rgba(180,45,45,.24); transition: transform .15s, background .15s; }
+        .patient-item .patient-delete-btn:hover { background: #c93636; transform: translateY(-50%) scale(1.08); }
+        .patient-item .patient-delete-btn span { font-size: 17px; line-height: 1; font-weight: 700; pointer-events: none; }
         .patient-item .name { font-weight: bold; }
         .patient-item .info { font-size: 12px; color: #5f6d66; margin-top: 2px; }
         .patient-item .status { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; }
@@ -1093,6 +1096,17 @@
                         <div class="section-title">
                             <span>药品列表</span>
                             <div class="pharmacy-toolbar">
+                                <select id="pharmacyCategoryFilter" class="server-input" style="width:140px;" onchange="setPharmacyCategory(this.value)" title="按药品类型筛选">
+                                    <option value="all">全部类型</option>
+                                    <option value="中药饮品">中药饮品</option>
+                                    <option value="中成药">中成药</option>
+                                    <option value="西药">西药</option>
+                                    <option value="中药颗粒">中药颗粒</option>
+                                    <option value="自制成品">自制成品</option>
+                                    <option value="保健食品">保健食品</option>
+                                    <option value="unclassified">未归类（历史数据）</option>
+                                </select>
+                                <input type="text" id="pharmacySearchInput" class="server-input" style="flex:1; min-width:220px; max-width:360px; margin-right:auto;" placeholder="搜索药品名称、编码、厂家、批号或供应商…" oninput="setPharmacySearch(this.value)">
                                 <input type="file" id="excelFileInput" accept=".xlsx, .xls">
                                 <button onclick="document.getElementById('excelFileInput').click()"><i class="fas fa-file-import"></i> 导入</button>
                                 <button onclick="addPharmacyItem()" class="primary"><i class="fas fa-plus"></i> 新建处方</button>
@@ -1123,8 +1137,8 @@
                         </div>
                         <div style="overflow-x:auto;">
                             <table class="table-mock">
-                                <thead><tr><th>药品名称</th><th>数量</th><th>批号</th><th>效期</th><th>供应商</th><th>成本</th><th>时间</th></tr></thead>
-                                <tbody id="inRecordBody"><tr><td colspan="7" style="text-align:center;color:#5f6d66;">暂无记录</td></tr></tbody>
+                                <thead><tr><th>药品名称</th><th>类型</th><th>数量</th><th>批号</th><th>效期</th><th>供应商</th><th>成本</th><th>时间</th></tr></thead>
+                                <tbody id="inRecordBody"><tr><td colspan="8" style="text-align:center;color:#5f6d66;">暂无记录</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -1354,6 +1368,7 @@
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header"><h3>药品入库</h3><span style="cursor:pointer;" onclick="document.getElementById('modalStockIn').style.display='none'"><i class="fas fa-times"></i></span></div>
             <div class="modal-form-group"><label>药品名称</label><input type="text" id="si_drugName" placeholder="如：阿莫西林胶囊"></div>
+            <div class="modal-form-group"><label>药品类型（必填）</label><select id="si_category"><option value="">请选择药品类型</option><option>中药饮品</option><option>中成药</option><option>西药</option><option>中药颗粒</option><option>自制成品</option><option>保健食品</option></select></div>
             <div style="display:flex; gap:10px;">
                 <div class="modal-form-group" style="flex:1;"><label>数量</label><input type="number" id="si_qty"></div>
                 <div class="modal-form-group" style="flex:1;"><label>单位</label><select id="si_unit" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;"><option>盒</option><option>瓶</option><option>袋</option><option>支</option></select></div>
@@ -1390,7 +1405,7 @@
             <div class="modal-header"><h3 id="kbModalTitle">新增药典条目</h3><span style="cursor:pointer;" onclick="document.getElementById('modalKB').style.display='none'"><i class="fas fa-times"></i></span></div>
             <div class="kb-field">
                 <label>药品名称（必填）</label><input type="text" id="kb_name">
-                <label>类别（如：西药 / 中成药 / 中药饮片）</label><input type="text" id="kb_category" placeholder="西药">
+                <label>类别（如：西药 / 中成药 / 中药饮品）</label><input type="text" id="kb_category" placeholder="西药">
                 <label>功能 / 适应症</label><textarea id="kb_functions" rows="2"></textarea>
                 <label>用法用量</label><textarea id="kb_usage" rows="2"></textarea>
                 <label>禁忌</label><textarea id="kb_contraindications" rows="2"></textarea>
@@ -1422,7 +1437,9 @@
 
     <script>
     // ==================== 服务器地址配置 ====================
-    const SERVER_URL = (localStorage.getItem('clinic_server_url') || window.location.origin).replace(/\/+$/, '');
+    const CURRENT_ORIGIN = /^https?:$/.test(window.location.protocol) ? window.location.origin : '';
+    const SERVER_URL = (CURRENT_ORIGIN || localStorage.getItem('clinic_server_url') || 'http://localhost:3002').replace(/\/+$/, '');
+    if (CURRENT_ORIGIN) localStorage.setItem('clinic_server_url', CURRENT_ORIGIN);
     const API_BASE = SERVER_URL + '/api';
     let currentUser = localStorage.getItem('clinic_user') || '';
     let authToken = localStorage.getItem('clinic_token') || '';
@@ -1516,7 +1533,10 @@
     let dbPatients = [], dbDrugKnowledge = [], dbUserFormulas = [], dbFormulaLibrary = [];
     let dbRecordTerms = {}, dbClinicalTerms = {};
     let prescriptionTempList = [], editingOutpatientId = null, currentPatientId = null;
-    let patientSearch = '', selectedPatientKey = null, kbEditId = null;
+    let patientSearch = '', pharmacySearch = '', selectedPatientKey = null, kbEditId = null;
+    let editingSavedVisit = false;
+    let pharmacyCategory = 'all';
+    const PHARMACY_CATEGORIES = ['中药饮品', '中成药', '西药', '中药颗粒', '自制成品', '保健食品'];
     let currentPeriod = 'today';
     let dashboardStats = null;
     let clinicSearch = '', clinicSearchTimer = null;
@@ -1685,8 +1705,35 @@
                 <div class="info">${esc(p.phone||'无电话')}</div>
                 ${dispenseBadge(p.name)}
                 <span class="status ${p.status==='已就诊'?'done':'pending'}">${esc(p.status)}</span>
+                <button type="button" class="patient-delete-btn" onclick="event.stopPropagation(); deleteClinicPatient(${p.id})" title="删除该门诊记录" aria-label="删除该门诊记录"><span aria-hidden="true">×</span></button>
             </div>
         `).join('');
+    }
+
+    async function deleteClinicPatient(id) {
+        const patient = (dbOutpatient || []).find(item => String(item.id) === String(id));
+        if (!patient) return;
+        if (!confirm(`确定删除患者「${patient.name || '未命名'}」的门诊记录吗？\n未收费账单和待发药记录会同步删除；已收费或已发药记录会被系统保护。`)) return;
+        try {
+            const response = await apiFetch(`${API_BASE}/outpatients/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (String(currentPatientId) === String(id)) currentPatientId = null;
+            if (String(editingOutpatientId) === String(id)) editingOutpatientId = null;
+            editingSavedVisit = false;
+            await loadAllData();
+            if (!currentPatientId) {
+                const center = document.getElementById('clinicCenterArea');
+                const history = document.getElementById('clinicHistoryList');
+                if (center) center.innerHTML = '<div style="text-align:center; color:#5f6d66; padding:40px 0;"><i class="fas fa-user-md" style="font-size:40px; opacity:0.3;"></i><div style="margin-top:10px;">请从左侧选择患者，或新建患者接诊</div></div>';
+                if (history) history.innerHTML = '<div style="text-align:center; color:#5f6d66; font-size:12px; padding:10px;">选择患者后显示</div>';
+            }
+            const extra = [];
+            if (result.deletedBilling) extra.push(`${result.deletedBilling} 张待收费单`);
+            if (result.deletedPharmacy) extra.push(`${result.deletedPharmacy} 条待发药记录`);
+            showToast(`已删除门诊记录${extra.length ? '，并清理' + extra.join('、') : ''}`);
+        } catch (err) {
+            if (err.message !== '未登录') showToast(err.message || '删除失败', 'error');
+        }
     }
 
     function dispenseBadge(patientName) {
@@ -1714,6 +1761,7 @@
     function selectClinicPatient(id) {
         currentPatientId = id;
         editingOutpatientId = id;
+        editingSavedVisit = false;
         const p = dbOutpatient.find(i=>i.id===id);
         if(!p) return;
         renderClinicPatientList();
@@ -1872,7 +1920,8 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         const d = item || {};
         const text = [d.category, d.drugClassZh, d.dosageForm, d.form, d.route, d.usage, d.functions,
             d.indications, d.notes, d.name].map(v => String(v || '')).join(' ');
-        if (String(d.category || '').includes('中药饮片')) return 'herb';
+        const category = String(d.category || '').trim();
+        if (['中药饮品', '中药饮片', '中药颗粒'].includes(category)) return 'herb';
         if (/(注射液|注射用|静脉滴注|静脉注射|静滴|输液|溶媒|氯化钠注射液|葡萄糖注射液|皮试注射液)/i.test(text)) return 'infusion';
         if (/(外用|涂剂|涂膜剂|搽剂|洗剂|凝胶|栓剂|软膏|乳膏|药膏|霜|滴眼|滴鼻|滴耳|口腔喷|鼻腔喷|喷雾剂|喷雾型|含漱|灌肠|开塞露|消毒液|消毒酒精|清凉油|外治)/i.test(text)) return 'external';
         if (/(膏药|贴敷|敷贴|巴布膏|橡胶膏|硬膏|穴位贴|三伏贴|膏药贴|创口贴|退热贴|开胃贴|膏|贴|敷)/i.test(text)) return 'patch';
@@ -1894,7 +1943,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         } catch (e) { console.error('药典库加载失败', e); }
         (dbDrugInventory || []).forEach(d => {
             const nm = String(d.name || '').trim(); if (!nm || seen[nm]) return; seen[nm] = 1;
-            if (String(d.category || '').trim() !== '中药饮片') return;
+            if (!['中药饮品', '中药饮片', '中药颗粒'].includes(String(d.category || '').trim())) return;
             merged.push({ name: nm, spec: d.spec || '', price: Number(d.price) || 0, source: '库存' });
         });
         rxHerbCache = merged;
@@ -2402,7 +2451,9 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
             const element = document.getElementById(elementId);
             if (element) patient[field] = element.value;
         });
-    }    function renderClinicCenter(p) {
+    }
+
+    function renderClinicCenter(p) {
         if (clinicRenderedId) captureClinicFormState(clinicRenderedId);
         closeRecordTermPopup();
         if (!p) return;
@@ -2424,9 +2475,15 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
             <div class="rx-types">${rxNavTypes}</div>
         </div>${rxPrescriptionSummary()}${rxBody}`;
         const savedRecord = p.status === '已就诊';
-        area.classList.toggle('readonly-view', savedRecord);
+        const editSavedVisit = savedRecord && editingSavedVisit;
+        area.classList.toggle('readonly-view', savedRecord && !editSavedVisit);
+        const recordBanner = savedRecord
+            ? (editSavedVisit
+                ? '<div class="clinic-view-banner editing"><div><b>修改病历 · 修改模式</b><div>可修改诊断、病史和未收费、未发药处方，保存后会同步更新收费和药房记录。</div></div><button type="button" class="op-btn" onclick="cancelEditSavedVisit()"><i class="fas fa-rotate-left"></i> 取消修改</button></div>'
+                : '<div class="clinic-view-banner"><div><b>已保存接诊 · 查看模式</b><div>如需更正，请点击右侧“修改病历”。</div></div><button type="button" class="op-btn" onclick="startEditSavedVisit()"><i class="fas fa-pen"></i> 修改病历</button></div>')
+            : '';
         area.innerHTML = `
-        ${savedRecord ? '<div class="clinic-view-banner"><div><b>已保存接诊 · 查看模式</b><div>该门诊记录已保存，不可再修改。</div></div><span class="status done">已就诊</span></div>' : ''}
+        ${recordBanner}
         <div class="clinic-section">
             <div class="label">患者信息</div>
             <div class="patient-summary"><b>${esc(p.name)}</b><span>${esc(p.gender || '-')} | ${esc(p.age || '-')}岁 | ${esc(p.phone || '-')}</span><div>接诊医师：${esc(p.doctor || '待分配')}　|　收费方式：自费</div></div>
@@ -2451,8 +2508,13 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
             <textarea id="cf_advice" rows="2" placeholder="医嘱">${esc(p.advice || '')}</textarea>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-            ${p.status === '已就诊'
-                ? '<button class="op-btn" onclick="printClinic()"><i class="fas fa-print"></i> 打印病历</button>'
+            ${savedRecord
+                ? (editSavedVisit
+                    ? `<button class="btn-primary" onclick="saveClinicData()"><i class="fas fa-save"></i> 保存修改</button>
+            <button class="op-btn" onclick="cancelEditSavedVisit()"><i class="fas fa-rotate-left"></i> 取消修改</button>
+            <button class="op-btn" onclick="printClinic()">打印病历</button>`
+                    : `<button class="op-btn" onclick="startEditSavedVisit()"><i class="fas fa-pen"></i> 修改病历</button>
+            <button class="op-btn" onclick="printClinic()">打印病历</button>`)
                 : `<button class="btn-primary" onclick="saveClinicData()"><i class="fas fa-save"></i> 保存接诊</button>
             <button class="op-btn" onclick="printClinic()">打印病历</button>
             <button class="op-btn" onclick="aiReviewRx()">AI审方</button>`}
@@ -2460,6 +2522,33 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         const allRxItems = rxAllItems(clinicDraft.prescription);
         prescriptionTempList = allRxItems.length ? allRxItems : (p.clinicData && p.clinicData.prescription ? [] : (p.prescriptions ? [...p.prescriptions] : []));
     }
+
+    function startEditSavedVisit() {
+        const p = dbOutpatient.find(item => String(item.id) === String(editingOutpatientId));
+        if (!p || p.status !== '已就诊') return;
+        editingSavedVisit = true;
+        renderClinicCenter(p);
+        showToast('已进入病历修改模式，保存后会同步更新收费和药房记录');
+    }
+
+    async function cancelEditSavedVisit() {
+        if (!confirm('确定取消本次修改并恢复已保存内容吗？')) return;
+        const id = currentPatientId || editingOutpatientId;
+        editingSavedVisit = false;
+        clinicDraft = null;
+        clinicRenderedId = null;
+        prescriptionTempList = [];
+        await loadAllData();
+        const saved = dbOutpatient.find(item => String(item.id) === String(id));
+        if (!saved) return;
+        currentPatientId = saved.id;
+        editingOutpatientId = saved.id;
+        renderClinicPatientList();
+        renderClinicCenter(saved);
+        renderClinicHistory(saved);
+        showToast('已取消修改，已恢复服务器上的病历内容');
+    }
+
     function renderClinicHistory(p) {
         const container = document.getElementById('clinicHistoryList');
         const history = dbOutpatient.filter(o => o.id !== p.id && (o.name === p.name || (p.phone && o.phone === p.phone)));
@@ -2766,6 +2855,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
     }
 
     function openDirectAddModal() {
+        editingSavedVisit = false;
         gotoPage('page-outpatient');
         const area = document.getElementById('clinicCenterArea');
         if (!area) return;
@@ -2854,6 +2944,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                 prescriptionTempList = [];
             }
 
+        const editingSaved = !!(op && op.status === '已就诊' && editingSavedVisit);
         try {
             const body = {
                 patient,
@@ -2863,10 +2954,13 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                     prescriptionType: d.prescriptionType || rxDraft()?.type || '', price: d.price, subtotal: d.subtotal
                 }))
             };
-            if (op) body.outpatientId = op.id;
+            if (op && !editingSaved) body.outpatientId = op.id;
 
-            const res = await apiFetch(`${API_BASE}/visits/complete`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
+            const requestUrl = editingSaved
+                ? `${API_BASE}/outpatients/${encodeURIComponent(op.id)}/visit`
+                : `${API_BASE}/visits/complete`;
+            const res = await apiFetch(requestUrl, {
+                method: editingSaved ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify(body)
             });
             const result = await res.json();
@@ -2881,7 +2975,16 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                 renderClinicPatientList();
             }
             const drugTotal = prescriptionTempList.reduce((s,d)=>s+(Number(d.subtotal)||0), 0);
-            if (result.pharmacyPushed > 0) {
+            if (editingSaved) {
+                editingSavedVisit = false;
+                const billText = drugTotal > 0
+                    ? `待收费 ${result.billNo || ''} ¥${(Number(result.billingAmount)||0).toFixed(2)}`
+                    : '未产生药品收费';
+                const pharmacyText = result.pharmacyPushed > 0
+                    ? `，药房待发药 ${result.pharmacyPushed} 条`
+                    : '';
+                showToast(`修改成功：门诊病历和患者档案已同步，${billText}${pharmacyText}`, 'success');
+            } else if (result.pharmacyPushed > 0) {
                 showToast(`接诊完成：门诊已保存，${result.pharmacyPushed} 条处方已推送药房，已生成待收费 ${result.billNo || ''} ¥${(Number(result.billingAmount)||0).toFixed(2)}，请前往收费`, 'success');
             } else if (drugTotal > 0) {
                 showToast(`接诊完成：门诊已保存，已生成待收费 ${result.billNo || ''} ¥${(Number(result.billingAmount)||0).toFixed(2)}，请前往收费`, 'success');
@@ -4293,6 +4396,40 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
     });
 
     // 【v3.3】 药房列表：物品列表 / 库存列表 两个页签
+    function setPharmacySearch(value) {
+        pharmacySearch = value || '';
+        renderPharmacyItemTable();
+        renderPharmacyStockTable();
+    }
+
+    function setPharmacyCategory(value) {
+        pharmacyCategory = value || 'all';
+        renderPharmacyItemTable();
+        renderPharmacyStockTable();
+    }
+
+    function normalizedDrugCategory(drug) {
+        const category = String(drug && drug.category || '').trim();
+        return category === '中药饮片' ? '中药饮品' : category;
+    }
+
+    function filteredDrugInventory() {
+        const q = pharmacySearch.trim().toLowerCase();
+        return (dbDrugInventory || []).filter(d => {
+            const category = normalizedDrugCategory(d);
+            if (pharmacyCategory === 'unclassified') {
+                if (PHARMACY_CATEGORIES.includes(category)) return false;
+            } else if (pharmacyCategory !== 'all' && category !== pharmacyCategory) {
+                return false;
+            }
+            if (!q) return true;
+            return [
+                d.name, d.code, d.spec, d.manufacturer, d.category, d.supplier,
+                d.approvalNo, d.batchNo, d.unit
+            ].some(value => String(value || '').toLowerCase().includes(q));
+        });
+    }
+
     function renderPharmacyList() {
         const active = document.querySelector('#pharmaListTabs span.active')?.dataset.tab || 'items';
         const itemsEl = document.getElementById('pharmaTabItems');
@@ -4307,11 +4444,13 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
     function renderPharmacyItemTable() {
         const tb = document.getElementById('pharmacyItemBody');
         if (!tb) return;
-        if (!dbDrugInventory.length) {
-            tb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#5f6d66;padding:15px;">暂无库存数据</td></tr>';
+        const rows = filteredDrugInventory();
+        if (!rows.length) {
+            const message = dbDrugInventory.length ? '未找到匹配药品' : '暂无库存数据';
+            tb.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#5f6d66;padding:15px;">${message}</td></tr>`;
             return;
         }
-        tb.innerHTML = dbDrugInventory.map((d, idx) => {
+        tb.innerHTML = rows.map((d, idx) => {
             const price = Number(d.price) || 0, cost = Number(d.costPrice) || 0, stock = Number(d.stock) || 0;
             const stockCost = stock * cost;
             const rate = price > 0 ? ((price - cost) / price * 100) : 0;
@@ -4334,11 +4473,13 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
     function renderPharmacyStockTable() {
         const tb = document.getElementById('pharmacyStockBody');
         if (!tb) return;
-        if (!dbDrugInventory.length) {
-            tb.innerHTML = '<tr><td colspan="16" style="text-align:center;color:#5f6d66;padding:15px;">暂无库存数据</td></tr>';
+        const rows = filteredDrugInventory();
+        if (!rows.length) {
+            const message = dbDrugInventory.length ? '未找到匹配药品' : '暂无库存数据';
+            tb.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#5f6d66;padding:15px;">${message}</td></tr>`;
             return;
         }
-        tb.innerHTML = dbDrugInventory.map((d, idx) => {
+        tb.innerHTML = rows.map((d, idx) => {
             const specUnit = [d.spec, d.unit].filter(Boolean).join('×') || '-';
             return `<tr>
                 <td>${idx + 1}</td>
@@ -4549,11 +4690,11 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         const inTb = document.getElementById('inRecordBody');
         if(dbDrugInRecords.length) {
             inTb.innerHTML = dbDrugInRecords.map(r => `<tr>
-                <td><span class="drug-name" data-drug-name="${esc(r.drugName)}">${esc(r.drugName)}</span></td><td>${esc(r.qty)}</td><td>${esc(r.batchNo||'-')}</td>
+                <td><span class="drug-name" data-drug-name="${esc(r.drugName)}">${esc(r.drugName)}</span></td><td>${esc(r.category||'未归类')}</td><td>${esc(r.qty)}</td><td>${esc(r.batchNo||'-')}</td>
                 <td>${esc(r.expiry||'-')}</td><td>${esc(r.supplier||'-')}</td><td>¥${(r.cost||0).toFixed(2)}</td><td>${esc(r.date)}</td>
             </tr>`).join('');
         } else if(inTb) {
-            inTb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#5f6d66;">暂无记录</td></tr>';
+            inTb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#5f6d66;">暂无记录</td></tr>';
         }
         const outTb = document.getElementById('outRecordBody');
         if(dbDrugOutRecords.length) {
@@ -4664,19 +4805,21 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
     }
 
     function openStockInModal() {
-        ['si_drugName','si_qty','si_batchNo','si_productionDate','si_expiry','si_supplier','si_cost','si_price'].forEach(id=>document.getElementById(id).value='');
+        ['si_drugName','si_qty','si_batchNo','si_productionDate','si_expiry','si_supplier','si_cost','si_price','si_category'].forEach(id=>document.getElementById(id).value='');
         document.getElementById('modalStockIn').style.display = 'flex';
     }
 
     async function saveStockIn() {
         const drugName = document.getElementById('si_drugName').value.trim();
         const qty = parseInt(document.getElementById('si_qty').value)||0;
+        const category = document.getElementById('si_category').value;
         if(!drugName||!qty||qty<=0) return alert('请填写药品名称和有效数量');
+        if(!category) return alert('请选择药品类型；未归类药品必须在新入库时完成归类');
         try {
             await apiFetch(`${API_BASE}/drug-inventory/stock-in`, {
                 method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({
-                    drugName, qty, unit: document.getElementById('si_unit').value,
+                    drugName, qty, category, unit: document.getElementById('si_unit').value,
                     batchNo: document.getElementById('si_batchNo').value,
                     productionDate: document.getElementById('si_productionDate').value,
                     expiry: document.getElementById('si_expiry').value,
@@ -4954,7 +5097,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                 mobileUrl.value = url; mobileUrl.style.color = isFallback ? '#e67e00' : '#333';
             }
             if(mobileQR && isValidUrl(url) && !isLocalhost(url)) {
-                mobileQR.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(url)}`;
+                mobileQR.src = `/api/qr-code?size=160&data=${encodeURIComponent(url)}`;
                 mobileQR.hidden = false;
             } else if(mobileQR) {
                 mobileQR.removeAttribute('src');

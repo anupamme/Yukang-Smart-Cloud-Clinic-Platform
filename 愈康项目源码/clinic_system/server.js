@@ -4,6 +4,7 @@
 //  业务逻辑在 src/services，文件读写集中在 src/repository。
 // ============================================================
 const express = require('express');
+const packageJson = require('./package.json');
 const cors = require('cors');
 const { exec } = require('child_process');
 const knowledge = require('./knowledge');
@@ -14,6 +15,7 @@ const localCrypto = require('./src/security/localCryptoService');
 const { startEdgeAgent, stopEdgeAgent } = require('./src/services/edgeAgentService');
 const systemService = require('./src/services/systemService');
 const accountService = require('./src/services/accountService');
+const inventoryService = require('./src/services/inventoryService');
 
 const authRoutes = require('./src/routes/authRoutes');
 const accountRoutes = require('./src/routes/accountRoutes');
@@ -59,9 +61,12 @@ statisticsRoutes(app);
 visitRoutes(app);
 systemRoutes(app);
 
-// 通用集合 CRUD 放在业务路由之后，避免抢占 /api/drug-inventory 等具体路径。
+// 页面、静态资源和二维码等公共路由必须先注册，避免被通用 /api/:collection 鉴权路由抢占。
+pageRoutes(app, BASE_DIR, { registerFallback: false });
+
+// 通用集合 CRUD 放在具体业务路由之后，避免抢占 /api/drug-inventory 等具体路径。
 collectionRoutes(app);
-pageRoutes(app, BASE_DIR);
+pageRoutes.fallback(app);
 
 app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
@@ -82,6 +87,8 @@ async function startServer() {
         await repo.initRootStorage();
         const accountStatus = await accountService.initialize(repo.DATA_DIR, dataKey);
         console.log(`  账号控制库已就绪：${accountStatus.database}（迁移 ${accountStatus.migrated} 个旧账号）`);
+        const categoryMigration = await inventoryService.migrateLegacyCategories();
+        console.log(`  药品分类迁移完成：库存 ${categoryMigration.inventoryUpdated} 条 / 入库记录 ${categoryMigration.recordsUpdated} 条`);
         const dbStatus = await repo.getStatus();
         console.log(`  SQLite 数据库已就绪：${dbStatus.database}`);
         repo.startAutoBackup();
@@ -108,7 +115,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
         const lanIP = getLANIP();
         console.log('========================================');
-        console.log('  愈康项目服务已启动（v5.0）');
+        console.log(`  愈康项目服务已启动（v${process.env.YUKONG_APP_VERSION || packageJson.version}）`);
         console.log('========================================');
         console.log(`  电脑本机访问: http://localhost:${PORT}`);
         console.log(`  手机端访问:   http://${lanIP}:${PORT}`);

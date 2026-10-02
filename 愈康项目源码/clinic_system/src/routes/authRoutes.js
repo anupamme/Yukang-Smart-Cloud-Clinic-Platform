@@ -1,6 +1,7 @@
 const asyncRoute = require('../utils/asyncRoute');
 const authService = require('../services/authService');
 const { getLANIP } = require('../utils/helpers');
+const packageJson = require('../../package.json');
 
 module.exports = function registerAuthRoutes(app, port) {
     app.post('/api/auth/register', asyncRoute(async (req, res) => {
@@ -20,11 +21,13 @@ module.exports = function registerAuthRoutes(app, port) {
     app.get('/api/server-info', (req, res) => {
         try {
             const lanIp = getLANIP();
-            res.json({ success: true, pcLanUrl: `http://${lanIp}:${port}` });
+            res.json({ success: true, app: 'yukang-clinic', version: packageJson.version, pcLanUrl: `http://${lanIp}:${port}` });
         } catch (err) {
             console.error('获取局域网地址失败:', err);
             res.json({
                 success: false,
+                app: 'yukang-clinic',
+                version: packageJson.version,
                 error: err.message || '获取局域网地址失败',
                 code: 'SERVER_INFO_FAILED',
                 pcLanUrl: `http://127.0.0.1:${port}`

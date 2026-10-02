@@ -1,0 +1,6 @@
+{
+  "updater": {
+    "channelUrl": "https://download.example.com/yukang/update-manifest.json",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\n请替换为发布方 release-public.pem 的内容\n-----END PUBLIC KEY-----"
+  }
+}

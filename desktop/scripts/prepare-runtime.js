@@ -12,7 +12,8 @@ const runtimeDir = path.resolve(process.env.YUKANG_RUNTIME_DIR || path.join(desk
 const targetDir = path.join(runtimeDir, 'clinic_system');
 const knowledgeDb = process.env.YUKANG_KNOWLEDGE_DB ? path.resolve(process.env.YUKANG_KNOWLEDGE_DB) : '';
 const allowLiteIndex = process.env.YUKANG_ALLOW_LITE_INDEX === '1';
-const version = require('../package.json').version;
+const sourcePackage = require(path.join(sourceDir, 'package.json'));
+const version = sourcePackage.version;
 
 function assertInside(parent, child, label) {
     const relative = path.relative(path.resolve(parent), path.resolve(child));
@@ -28,7 +29,9 @@ function shouldCopy(src) {
     const name = path.basename(src);
 
     if (parts.includes('node') || parts.includes('node_modules') || parts.includes('clinic_database')) return false;
-    if (parts.includes('tests') || parts.includes('.pytest_cache') || parts.includes('__pycache__')) return false;
+    if (parts.includes('tests') || parts.includes('tools') || parts.includes('local_rag_worker') || parts.includes('docs')) return false;
+    if (parts.includes('.pytest_cache') || parts.includes('__pycache__')) return false;
+    if (['regression-test.js', 'package-lock.json', 'start.bat', 'start.sh', 'start.command', 'start_rag.bat', '.gitignore'].includes(name)) return false;
     if (name.startsWith('_backup_')) return false;
     if (name === '_hybrid_input_' || name.startsWith('_hybrid_input_')) return false;
     if (name === 'pharmacopoeia_texts.jsonl') return false;
@@ -87,13 +90,30 @@ async function main() {
     if (install.error) throw install.error;
     if (install.status !== 0) throw new Error(`运行依赖安装失败，退出码 ${install.status}`);
 
-    for (const dependency of ['express', 'cors']) {
+    const requiredDependencies = [
+        'express',
+        'cors',
+        'qrcode',
+        'xlsx',
+        '@fortawesome/fontawesome-free',
+    ];
+    for (const dependency of requiredDependencies) {
         if (!fs.existsSync(path.join(targetDir, 'node_modules', dependency))) {
             throw new Error(`运行依赖缺失: ${dependency}`);
         }
     }
 
-    fs.renameSync(path.join(targetDir, 'node_modules'), path.join(targetDir, 'vendor'));
+    const runtimeIndex = fs.readFileSync(path.join(targetDir, 'index.html'), 'utf8');
+    for (const forbidden of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'api.qrserver.com']) {
+        if (runtimeIndex.includes(forbidden)) {
+            throw new Error(`运行页面仍包含外部 CDN: ${forbidden}`);
+        }
+    }
+
+    const nodeModulesDir = path.join(targetDir, 'node_modules');
+    const vendorDir = path.join(targetDir, 'vendor');
+    fs.rmSync(vendorDir, { recursive: true, force: true });
+    fs.renameSync(nodeModulesDir, vendorDir);
 
     const info = {
         version,
@@ -101,7 +121,8 @@ async function main() {
         knowledgeDb: hasKnowledgeDb ? knowledgeDb : null,
         knowledgeSha256: hasKnowledgeDb ? await sha256(targetIndex) : null,
         knowledgeBytes: hasKnowledgeDb ? fs.statSync(targetIndex).size : 0,
-        builtAt: new Date().toISOString()
+        builtAt: new Date().toISOString(),
+        runtimeDependencies: 'vendor'
     };
     fs.writeFileSync(path.join(targetDir, 'RELEASE_VERSION.txt'), `${version}\n`, 'utf8');
     fs.writeFileSync(path.join(targetDir, 'build-info.json'), `${JSON.stringify(info, null, 2)}\n`, 'utf8');

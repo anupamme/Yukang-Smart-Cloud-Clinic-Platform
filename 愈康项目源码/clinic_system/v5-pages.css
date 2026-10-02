@@ -141,6 +141,7 @@ header {
 .v5-payment-total span { color: var(--text-sub); font-size: 12px; }
 .v5-payment-total strong { color: var(--v5-ink); font-size: 27px; font-variant-numeric: tabular-nums; }
 .v5-change { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #fbf4e6; color: #755724; font-size: 12px; }
+.v5-field .v5-change { margin-top: 0; min-height: 40px; display: flex; align-items: center; }
 .v5-restore-input { margin-top: 12px; }
 .v5-error { min-height: 18px; margin-top: 8px; color: var(--v5-cinnabar); font-size: 12px; }
 

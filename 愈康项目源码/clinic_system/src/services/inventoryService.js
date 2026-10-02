@@ -1,6 +1,54 @@
-﻿const HttpError = require('../errors/HttpError');
+const HttpError = require('../errors/HttpError');
 const repo = require('../repository/sqliteRepository');
 const { newId, toNum, todayKey } = require('../utils/helpers');
+
+const INVENTORY_CATEGORIES = ['中药饮品', '中成药', '西药', '中药颗粒', '自制成品', '保健食品'];
+const LEGACY_CATEGORY_MAP = { '中药饮片': '中药饮品' };
+
+function normalizeInventoryCategory(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return LEGACY_CATEGORY_MAP[raw] || raw;
+}
+
+function validateInventoryCategory(value, required) {
+    const category = normalizeInventoryCategory(value);
+    if (!category && required) {
+        throw new HttpError(400, '请选择药品类型，新入库药品必须归类', 'VALIDATION_ERROR');
+    }
+    if (category && !INVENTORY_CATEGORIES.includes(category)) {
+        throw new HttpError(400, `药品类型无效：${category}`, 'VALIDATION_ERROR');
+    }
+    return category;
+}
+
+function migrateLegacyInventoryData(inventory = [], inRecords = []) {
+    let inventoryUpdated = 0;
+    let recordsUpdated = 0;
+    const categoryByName = new Map();
+
+    for (const drug of inventory) {
+        const oldCategory = String(drug.category || '').trim();
+        const category = normalizeInventoryCategory(oldCategory);
+        if (category !== oldCategory) {
+            drug.category = category;
+            inventoryUpdated += 1;
+        }
+        if (category) categoryByName.set(String(drug.name || '').trim().toLowerCase(), category);
+    }
+
+    for (const record of inRecords) {
+        const oldCategory = String(record.category || '').trim();
+        const inventoryCategory = categoryByName.get(String(record.drugName || '').trim().toLowerCase()) || '';
+        const category = inventoryCategory || normalizeInventoryCategory(oldCategory);
+        if (category && category !== oldCategory) {
+            record.category = category;
+            recordsUpdated += 1;
+        }
+    }
+
+    return { inventoryUpdated, recordsUpdated };
+}
 
 async function checkInventoryUnsafe(username, operator, body) {
     const items = Array.isArray(body && body.items) ? body.items : [];
@@ -33,16 +81,25 @@ async function checkInventoryUnsafe(username, operator, body) {
 }
 
 async function stockInUnsafe(username, operator, body) {
-    const { drugId, drugName, qty, batchNo, expiry, productionDate, supplier, cost, supplierId, unit, minStock, price } = body || {};
+    const { drugId, drugName, qty, batchNo, expiry, productionDate, supplier, cost, supplierId, unit, minStock, price, category } = body || {};
+    const normalizedDrugName = String(drugName || '').trim();
     const qtyNum = toNum(qty);
-    if (!drugName || qtyNum <= 0) {
+    if (!normalizedDrugName || qtyNum <= 0) {
         throw new HttpError(400, '药品名称和数量不能为空，且数量必须大于0', 'VALIDATION_ERROR');
     }
 
     const inventory = await repo.readCollection(username, 'drugInventory');
     const drug = drugId
         ? inventory.find(d => String(d.id) === String(drugId))
-        : inventory.find(d => d.name === drugName);
+        : inventory.find(d => d.name === normalizedDrugName);
+    const existingCategory = normalizeInventoryCategory(drug && drug.category);
+    const categoryRequired = !drug || !INVENTORY_CATEGORIES.includes(existingCategory);
+    const requestedCategory = validateInventoryCategory(category, categoryRequired);
+    if (drug && requestedCategory) drug.category = requestedCategory;
+    const recordCategory = requestedCategory || existingCategory || '';
+    if (!drug && !recordCategory) {
+        throw new HttpError(400, '请选择药品类型，新入库药品必须归类', 'VALIDATION_ERROR');
+    }
 
     let finalSupplierId = supplierId;
     if (supplier && !finalSupplierId) {
@@ -72,7 +129,8 @@ async function stockInUnsafe(username, operator, body) {
     } else {
         inventory.push({
             id: newId(),
-            name: drugName,
+            name: normalizedDrugName,
+            category: recordCategory,
             stock: qtyNum,
             unit: unit || '盒',
             minStock: minStock || 10,
@@ -93,7 +151,8 @@ async function stockInUnsafe(username, operator, body) {
     const inRecords = await repo.readCollection(username, 'drugInRecords');
     inRecords.push({
         id: newId(),
-        drugName,
+        drugName: normalizedDrugName,
+        category: recordCategory,
         qty: qtyNum,
         batchNo: batchNo || '',
         expiry: expiry || '',
@@ -124,6 +183,17 @@ async function batchImportUnsafe(username, operator, body) {
     for (const item of items) {
         const name = String(item.name || '').trim();
         if (!name) continue;
+        const existing = inventory.find(d => d.name === name);
+        const existingCategory = normalizeInventoryCategory(existing && existing.category);
+        const categoryRequired = !existing || !INVENTORY_CATEGORIES.includes(existingCategory);
+        const requestedCategory = validateInventoryCategory(item.category, categoryRequired);
+        if (existing && !requestedCategory && existing.category) {
+            existing.category = normalizeInventoryCategory(existing.category);
+        }
+        const recordCategory = requestedCategory || existingCategory || '';
+        if (!recordCategory) {
+            throw new HttpError(400, `药品“${name}”缺少药品类型，Excel 导入药品必须填写分类`, 'VALIDATION_ERROR');
+        }
         const key = name.toLowerCase();
         if (seenNames.has(key)) continue;
         seenNames.add(key);
@@ -146,7 +216,6 @@ async function batchImportUnsafe(username, operator, body) {
             finalSupplierId = existingSup.id;
         }
 
-        const existing = inventory.find(d => d.name === name);
         if (existing) {
             if (item.stock !== undefined && item.stock !== '') existing.stock = toNum(existing.stock) + Math.max(0, toNum(item.stock));
             if (item.price !== undefined && item.price !== '') existing.price = toNum(item.price);
@@ -158,7 +227,7 @@ async function batchImportUnsafe(username, operator, body) {
             if (item.manufacturer) existing.manufacturer = item.manufacturer;
             if (item.spec) existing.spec = item.spec;
             if (item.unit) existing.unit = item.unit;
-            if (item.category) existing.category = item.category;
+            if (requestedCategory) existing.category = requestedCategory;
             if (item.code) existing.code = item.code;
             if (item.approvalNo) existing.approvalNo = item.approvalNo;
             if (item.productionDate) existing.productionDate = item.productionDate;
@@ -173,7 +242,7 @@ async function batchImportUnsafe(username, operator, body) {
                 approvalNo: item.approvalNo || '',
                 spec: item.spec || '',
                 unit: item.unit || '盒',
-                category: item.category || '',
+                category: recordCategory,
                 manufacturer: item.manufacturer || '',
                 stock: Math.max(0, toNum(item.stock)),
                 minStock: item.minStock || 10,
@@ -196,6 +265,7 @@ async function batchImportUnsafe(username, operator, body) {
             inRecords.push({
                 id: newId(),
                 drugName: name,
+                category: recordCategory,
                 qty: inQty,
                 unit: item.unit || '盒',
                 batchNo: item.batchNo || '',
@@ -234,6 +304,30 @@ async function deleteDrugsUnsafe(username, body) {
     };
 }
 
+async function migrateLegacyCategoriesForStore(clinicId) {
+    return repo.runWithStore(clinicId, () => repo.transaction(async () => {
+        const inventory = await repo.readCollection('__clinic__', 'drugInventory');
+        const inRecords = await repo.readCollection('__clinic__', 'drugInRecords');
+        const result = migrateLegacyInventoryData(inventory, inRecords);
+        if (result.inventoryUpdated) await repo.writeCollection('__clinic__', 'drugInventory', inventory);
+        if (result.recordsUpdated) await repo.writeCollection('__clinic__', 'drugInRecords', inRecords);
+        return { clinicId, ...result };
+    }));
+}
+
+async function migrateLegacyCategories() {
+    const clinicIds = repo.listStoreIds();
+    const stores = [];
+    for (const clinicId of clinicIds) {
+        stores.push(await migrateLegacyCategoriesForStore(clinicId));
+    }
+    return {
+        stores,
+        inventoryUpdated: stores.reduce((sum, item) => sum + item.inventoryUpdated, 0),
+        recordsUpdated: stores.reduce((sum, item) => sum + item.recordsUpdated, 0),
+    };
+}
+
 async function checkInventory(username, operator, body) {
     return repo.transaction(() => checkInventoryUnsafe(username, operator, body));
 }
@@ -251,6 +345,11 @@ async function deleteDrugs(username, body) {
 }
 
 module.exports = {
+    INVENTORY_CATEGORIES,
+    normalizeInventoryCategory,
+    migrateLegacyInventoryData,
+    migrateLegacyCategoriesForStore,
+    migrateLegacyCategories,
     checkInventory,
     stockIn,
     batchImport,

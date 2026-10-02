@@ -1,8 +1,8 @@
 {
   "name": "yukang-desktop-packager",
-  "version": "5.0.0-preview.1",
+  "version": "5.1.0",
   "private": true,
-  "description": "YuKang Smart Cloud Clinic cross-platform desktop installer build",
+  "description": "愈康云诊所 v5.1 Windows 商业化离线单机版构建工程",
   "main": "main.js",
   "author": {
     "name": "YuKang Clinic",
@@ -11,10 +11,12 @@
   "license": "MIT",
   "scripts": {
     "prepare:runtime": "node scripts/prepare-runtime.js",
-    "dist:win": "npm run prepare:runtime && electron-builder --win nsis --publish never",
+    "dist:win": "npm run prepare:runtime && npm run verify:runtime && electron-builder --win nsis --publish never",
     "dist:linux": "npm run prepare:runtime && electron-builder --linux AppImage deb --publish never",
     "dist:mac": "npm run prepare:runtime && electron-builder --mac dmg zip --x64 --arm64 --publish never",
-    "install:electron": "node scripts/ensure-electron.js"
+    "install:electron": "node scripts/ensure-electron.js",
+    "verify:runtime": "node scripts/verify-runtime.js",
+    "smoke:runtime": "node scripts/smoke-runtime.js"
   },
   "devDependencies": {
     "electron": "^44.3.0",
@@ -34,7 +36,8 @@
     "files": [
       "main.js",
       "package.json",
-      "build/icon.png"
+      "build/icon.png",
+      "updater.js"
     ],
     "extraResources": [
       {
@@ -68,7 +71,8 @@
         "zh_CN",
         "en_US"
       ],
-      "language": "2052"
+      "language": "2052",
+      "artifactName": "YuKangClinic-Setup-${version}-${arch}.${ext}"
     },
     "linux": {
       "icon": "build/icon.png",

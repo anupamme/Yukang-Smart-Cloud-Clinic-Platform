@@ -105,3 +105,52 @@ test('v5 接诊只生成待收费，支付后仅写一次营收并记录补打',
         await server.stop();
     }
 });
+
+test('v5 实际收费允许优惠并按实收入账', async () => {
+    const server = await startV5Server('billing-discount');
+    try {
+        const auth = await registerOwner(server);
+        const visit = await server.request('/api/visits/complete', {
+            method: 'POST',
+            token: auth.token,
+            body: {
+                patient: { name: '优惠患者', gender: '女', age: 42 },
+                prescriptions: [
+                    { name: '黄芪', qty: 2, price: 25, qtyUnit: '袋' },
+                ],
+            },
+        });
+        assert.equal(visit.status, 200);
+        assert.equal(visit.data.billingAmount, 50);
+
+        const paid = await server.request(`/api/billing/${visit.data.billId}/pay`, {
+            method: 'POST',
+            token: auth.token,
+            body: {
+                payMethod: '微信',
+                actualAmount: 40,
+                receivedAmount: 50,
+                adjustmentReason: '老患者优惠',
+            },
+        });
+        assert.equal(paid.status, 200);
+        assert.equal(paid.data.amount, 50);
+        assert.equal(paid.data.originalAmount, 50);
+        assert.equal(paid.data.actualAmount, 40);
+        assert.equal(paid.data.discountAmount, 10);
+        assert.equal(paid.data.adjustmentAmount, -10);
+        assert.equal(paid.data.receivedAmount, 50);
+        assert.equal(paid.data.changeAmount, 10);
+        assert.equal(paid.data.adjustmentReason, '老患者优惠');
+
+        const revenue = await server.request('/api/revenue', { token: auth.token });
+        assert.equal(revenue.status, 200);
+        assert.equal(revenue.data.length, 1);
+        assert.equal(revenue.data[0].amount, 40);
+        assert.equal(revenue.data[0].originalAmount, 50);
+        assert.equal(revenue.data[0].discountAmount, 10);
+        assert.equal(revenue.data[0].adjustmentReason, '老患者优惠');
+    } finally {
+        await server.stop();
+    }
+});

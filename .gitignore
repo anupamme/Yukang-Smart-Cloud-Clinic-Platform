@@ -59,3 +59,31 @@ _work/
 **/*.key
 **/*.crt
 **/*.csr
+
+# ---- Desktop build output and local runtime state ----
+desktop/node_modules/
+desktop/runtime/
+desktop/runtime-*/
+desktop/artifacts/
+desktop/release/
+desktop/logs/
+desktop/update-config.json
+
+# ---- Installer and package artifacts ----
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+
+# ---- Release signing and provisioning secrets ----
+**/*.pfx
+**/*.p12
+**/*.pvk
+**/*.snk
+**/*.jks
+release-secrets/
+cloud_control_plane/**/mTLS/
+cloud_control_plane/**/mtls/
+cloud_control_plane/**/certs/

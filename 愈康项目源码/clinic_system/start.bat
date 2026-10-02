@@ -31,22 +31,56 @@ for /f "tokens=*" %%i in ('"%NODE_EXE%" -v') do set NODE_VER=%%i
 echo   [OK] Node.js version: %NODE_VER%
 echo.
 
-:: 2. Install dependencies (bundled npm)
+:: 2. Check and prepare dependencies
 echo [2/4] Checking dependencies...
-if not exist "node_modules\express" (
-    echo   First run, installing packages...
-    call "%NPM_CMD%" install express cors --production
-    if %errorlevel% neq 0 (
-        echo   [FAIL] npm install failed
-        echo   Please run manually: cd "%~dp0" ^& npm install express cors
-        echo.
-        pause
-        exit /b 1
-    )
-    echo   [OK] Dependencies installed
-) else (
-    echo   [OK] Dependencies ready
+
+set "DEPS_DIR=D:\CodexApps\YuKangClinicDeps"
+
+:: Prefer the D-drive runtime so installs never grow on C drive.
+set "DEPS_OK=1"
+for %%D in (express cors qrcode xlsx @fortawesome\fontawesome-free) do (
+    if not exist "%DEPS_DIR%\node_modules\%%D\package.json" set "DEPS_OK=0"
 )
+if "%DEPS_OK%"=="1" goto dependencies_from_d
+
+echo   D drive runtime is incomplete. Checking bundled local dependencies...
+set "DEPS_OK=1"
+for %%D in (express cors qrcode xlsx @fortawesome\fontawesome-free) do (
+    if not exist "node_modules\%%D\package.json" set "DEPS_OK=0"
+)
+if "%DEPS_OK%"=="1" goto dependencies_local
+
+echo   Installing missing runtime dependencies to D drive...
+set "INSTALL_NPM=%NPM_CMD%"
+if not exist "%INSTALL_NPM%" set "INSTALL_NPM=npm"
+call "%INSTALL_NPM%" install --prefix "%DEPS_DIR%" --omit=dev --no-audit --no-fund --no-package-lock express@4.21.2 cors@2.8.5 qrcode@1.5.4 xlsx@0.18.5 @fortawesome/fontawesome-free@6.7.2
+if errorlevel 1 goto dependencies_fail
+
+:dependencies_from_d
+set "DEPS_OK=1"
+for %%D in (express cors qrcode xlsx @fortawesome\fontawesome-free) do (
+    if not exist "%DEPS_DIR%\node_modules\%%D\package.json" set "DEPS_OK=0"
+)
+if "%DEPS_OK%"=="0" goto dependencies_fail
+
+set "NODE_PATH=%DEPS_DIR%\node_modules"
+set "YUKONG_VENDOR_DIR=%DEPS_DIR%\node_modules"
+echo   [OK] D drive runtime dependencies ready
+goto dependencies_ready
+
+:dependencies_local
+echo   [OK] Bundled local dependencies ready
+goto dependencies_ready
+
+:dependencies_fail
+echo   [FAIL] Missing runtime dependencies or npm is unavailable.
+echo   Please check D:\CodexApps\YuKangClinicDeps and the system npm command.
+echo.
+pause
+exit /b 1
+
+:dependencies_ready
+echo   [OK] Dependencies ready
 echo.
 
 :: 3. Init data directory
@@ -76,9 +110,7 @@ if exist "D:\CodexEnvs\yukang-rag\Scripts\python.exe" (
     start "YuKang Local RAG" /min cmd /c "%~dp0start_rag.bat"
 )
 
-:: 自动打开浏览器（加随机数防缓存，避免跳到旧页面）
-start "" "http://localhost:%PORT%/login.html?t=%random%"
-
+:: Browser opens from server.js only after the HTTP listener is ready.
 "%NODE_EXE%" --disable-warning=ExperimentalWarning server.js
 
 echo.

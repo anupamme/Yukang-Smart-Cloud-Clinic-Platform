@@ -2,17 +2,20 @@
 
 > 面向独立诊所与连锁诊所的开源、本地优先一体化经营管理平台。
 
-**当前版本：v5.0** · **支持平台：Windows / macOS / Linux** · **默认端口：3002**
+**当前版本：v5.1.0** · **Windows x64 离线单机版** · **默认端口：3002（占用时自动避让）**
 
 愈康云诊所是一套面向个人医生、单体诊所、连锁总店与分店的管理系统。它将患者接诊、电子病历、电子处方、药房库存、门诊收费、经营统计、AI 辅助诊断、药典知识库和数据备份恢复集中在一个轻量平台中，电脑、手机和平板均可通过局域网访问。
 
 系统采用本地优先设计：核心诊疗和经营数据保存在使用者自己的电脑或服务器上，不依赖第三方云数据库。单体诊所可以直接使用；连锁机构可在总店统一查看各门店的聚合经营数据，并通过邀请码安全接入分店。
 
+> [!IMPORTANT]
+> v5.1.0 已完成 EXE 安装、托盘运行、自动端口、异常重启、本地离线资源、备份恢复、换机迁移和签名更新链路等代码基础，但当前仓库不包含 Windows 代码签名证书，默认构建结果是“未签名预览包”，**不能直接作为正式商业安装包大规模推广**。正式交付还必须取得药典数据使用授权，并用 EV/OV 代码签名证书重新构建。完整状态见 [商业发布检查清单](docs/commercial/商业发布检查清单.md)。
+
 ---
 
 ## 项目定位
 
-愈康 v5.0 同时解决三类场景：
+愈康 v5.1 同时解决三类场景：
 
 - **个人医生与单体诊所**：不需要复杂服务器和长期订阅，即可完成日常接诊、开方、发药、收费和统计。
 - **连锁总店**：统一管理本组织下的门店账号、分店接入和跨店经营概况。
@@ -60,6 +63,8 @@
 - 支持初诊、复诊、医保、自费等业务标识。
 - 患者搜索、历史记录、诊断和处方信息可快速联动。
 - 接诊完成后可进入待收费、药房发药和经营统计流程。
+- 患者列表支持对未收费、未发药记录执行删除，并同步清理关联的待收费和待发药数据。
+- 已保存病历支持进入修改模式；保存时会用事务同步更新门诊、患者档案、收费单和药房待发药记录。
 
 ### 电子病历与处方
 
@@ -77,6 +82,8 @@
 - 支持库存盘点，录入实盘数后自动计算差异并调整库存。
 - 提供无毛利、低毛利、低库存、库存耗尽和效期预警。
 - 发药后自动生成出库记录。
+- 支持按名称、编码、规格、厂家、供应商、批准文号、批号和单位搜索药品，并可组合药品分类筛选。
+- 新入库药品必须选择中药饮品、中成药、西药、中药颗粒、自制成品或保健食品分类，Excel 导入同步校验并归类。
 - 支持药品和库存数据的 Excel 智能导入导出。
 - 患者档案自动归拢历次就诊、诊断、处方、过敏史和既往史。
 
@@ -84,7 +91,8 @@
 
 - 接诊后生成待收费记录，收费成功后才计入正式营收。
 - 支持现金、微信、支付宝、银行卡、医保和其他支付方式。
-- 支持实收、找零和重复支付拦截。
+- 支持标准应收、实际收费、顾客付款、优惠减免、找零和调整原因，营收按实际收费入账。
+- 支持付款不足校验和重复支付拦截。
 - 提供 A4 收费单与 80mm 小票两种打印格式。
 - 已收费记录支持查询和补打，打印不会重复计入营收。
 - 收费数据进入营收统计、日报和门店经营汇总。
@@ -119,43 +127,71 @@
 
 ## 快速开始
 
-### 免安装包
+### 客户安装（推荐）
 
-发布包内已包含 Windows 便携版 Node.js 运行环境。
+正式交付目录中应包含 `YuKangClinic-Setup-5.1.0-x64.exe`。客户只需双击安装程序，按向导选择安装目录，安装完成后从桌面或开始菜单启动。
 
-1. 从 [GitHub Releases](https://github.com/wolongHyy/Yukang-Smart-Cloud-Clinic-Platform/releases) 下载对应版本。
-2. 解压到有写入权限的目录。
-3. 双击 `start.bat` 启动 Windows 版本。
-4. 浏览器打开 `http://localhost:3002/login.html`，注册账号后即可使用。
+1. 运行安装程序并选择安装目录。
+2. 首次启动会等待本地服务就绪，然后打开登录页。
+3. 关闭主窗口后程序继续在系统托盘运行；右键托盘图标可打开数据目录、备份目录、日志目录、端口设置和开机启动。
+4. 手机、平板访问：保持在同一可信 Wi-Fi，打开托盘菜单或“设置”页显示的局域网地址。
+5. 换电脑前先在“设置 → 数据备份”执行“导出完整数据”，在新电脑导入；不要直接复制 `clinic_database`。
+
+未签名预览包必须明确标注“仅供内部验收，Windows 可能显示未知发布者”，不能冒充正式签名版。
 
 ### 源码运行
 
 要求 Node.js 22.5 或更高版本。
 
-```bash
-cd 愈康项目源码/clinic_system
+```powershell
+Set-Location '愈康项目源码\clinic_system'
 npm install
 npm start
 ```
 
-默认访问地址：
-
-- 本机：`http://localhost:3002`
-- 手机或平板：与电脑连接同一 Wi-Fi，使用系统“设置”页显示的局域网地址
-
-Linux 和 macOS 也可执行：
-
-```bash
-bash start.sh
-```
-
-macOS 可双击 `start.command`，脚本会调用 `start.sh` 并在结束后保留终端窗口。
+默认访问地址为 `http://localhost:3002`。仅建议开发人员使用源码方式运行，客户交付使用安装包。
 
 ---
 
 ## 桌面安装包构建
 
 Windows/Linux 桌面安装包的构建源码位于 `desktop/`。仓库不提交 Electron 运行时、安装包和完整向量知识库。
+
+完整 Windows 商业交付构建统一使用：
+
+```powershell
+Set-Location .
+powershell -ExecutionPolicy Bypass -File tools\build-commercial-release.ps1
+```
+
+该脚本会：
+
+1. 校验主程序与桌面构建版本必须一致。
+2. 校验输出目录位于 `D:\`。
+3. 将完整知识库、Node 运行依赖、Font Awesome、SheetJS 和二维码能力打入运行时。
+4. 调用 electron-builder 生成 NSIS 安装程序。
+5. 校验 Authenticode，执行安装包运行时冒烟测试，计算 SHA-256，并生成独立客户交付目录。
+6. 调用 `tools/verify-delivery.ps1`，拒绝敏感文件、计划外安装包、漏算文件清单和推广状态矛盾。
+
+交付目录中的 `发布信息/RELEASE_INFO.json` 会记录 `release_channel` 和 `promotion_ready`。未签名构建只能得到 `internal-preview-unsigned`；只有签名有效、药典授权确认和干净虚拟机验收同时完成，才会输出 `commercial-signed`。
+
+当前没有代码签名证书时，只能显式构建未签名预览包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-commercial-release.ps1 -AllowUnsigned
+```
+
+正式发布时传入受信任证书，脚本会拒绝把未签名结果写成正式包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-commercial-release.ps1 `
+  -CertificatePath 'D:\ReleaseSecrets\yukang-code-signing.pfx' `
+  -DataLicenseConfirmed `
+  -CleanVmVerified `
+  -CertificatePassword '证书密码'
+```
+
+仅构建安装程序、不生成交付目录时，可在 `desktop/` 下执行以下命令；仍需设置完整知识库路径：
 
 ```bash
 cd desktop
@@ -178,11 +214,12 @@ YUKANG_KNOWLEDGE_DB=/path/to/knowledge_index.db npm run dist:linux
 
 无完整向量索引时可构建精简版：
 
-```bash
-YUKANG_ALLOW_LITE_INDEX=1 npm run dist:linux
+```powershell
+$env:YUKANG_ALLOW_LITE_INDEX = '1'
+npm run dist:linux
 ```
 
-macOS 安装包当前暂缓，构建源码保留。生成文件写入 `desktop/artifacts/`，不纳入 Git。详细说明见 `desktop/README.md`。
+macOS 安装包当前暂缓，构建源码保留。生成文件写入 `desktop/artifacts/`，不纳入 Git。详细说明见 [desktop/README.md](desktop/README.md) 和 [商业化文档目录](docs/commercial/)。
 
 ---
 
@@ -207,8 +244,8 @@ macOS 安装包当前暂缓，构建源码保留。生成文件写入 `desktop/a
 
 ```text
 Yukang-Smart-Cloud-Clinic-Platform/
-├─ 愈康项目源码/clinic_system/        # v5.0 主程序
-│  ├─ server.js                        # 服务入口
+├─ 愈康项目源码/clinic_system/        # v5.1 主程序
+│  ├─ server.js                        # 服务入口（Node.js 22.5+）
 │  ├─ src/                             # routes / services / repository 分层
 │  ├─ index.html                       # 主界面
 │  ├─ login.html                       # 登录与注册
@@ -220,10 +257,10 @@ Yukang-Smart-Cloud-Clinic-Platform/
 │  ├─ tools/                           # 知识库构建和数据维护脚本
 │  ├─ tests/                           # Node 单元测试
 │  └─ clinic_database/                 # 运行时数据，不纳入 Git
-├─ desktop/                            # Electron 桌面安装包构建源码
+├─ desktop/                            # Electron + NSIS 商业安装包构建源码
 ├─ cloud_control_plane/                # 可选商业云控制面预览
 ├─ local_rag_worker/                   # 可选本地 RAG Worker
-├─ docs/                               # 设计与产品文档
+├─ docs/commercial/                    # 客户安装、故障、备份、更新和许可文档
 ├─ .github/workflows/                  # GitHub Actions
 └─ README.md
 ```
@@ -243,6 +280,13 @@ Yukang-Smart-Cloud-Clinic-Platform/
 - 对“数据不得出域”有硬性要求的机构，应关闭第三方 AI 或改用本地模型。
 - `clinic_database/`、备份、日志和原始药典整理数据均已加入 `.gitignore`，不会随源码提交到 GitHub。
 
+### 部署安全边界
+
+- 当前会话主要保存在 Node.js 进程内存中，服务重启后需要重新登录。
+- 为了方便局域网电脑、手机和平板访问，HTTP 接口当前允许跨域；系统未提供登录限速、账号锁定和完整 CSRF 防护。
+- 仅应部署在本机或可信诊所局域网，不应通过路由器端口映射、公网 IP 或未经鉴权的反向代理直接暴露到互联网。
+- 如未来需要公网或跨院区使用，应先补齐 HTTPS、反向代理、登录限速、账号锁定、审计告警、CSRF 防护和渗透测试，再评估上线。
+
 ---
 
 ## 测试与验证
@@ -253,13 +297,31 @@ npm test
 node regression-test.js
 ```
 
-当前 v5.0 的验证基线：
+当前 v5.1 的验证基线：
 
-- Node 单元测试：23 / 23 通过
+- Node 单元测试：35 / 35 通过
 - 完整业务回归：114 / 114 通过
 - Impeccable 界面检查：0 findings
 
 测试覆盖账号注册、身份证保护、总店/分店权限、门店隔离、邀请码、收费、库存、备份恢复和门店经营汇总。
+
+---
+
+## 商业化交付状态
+
+| 路线 A 要求 | 项目现状 | 是否可直接正式推广 |
+| --- | --- | --- |
+| EXE/NSIS 安装程序 | 已接入 electron-builder，支持选择安装目录、桌面和开始菜单快捷方式 | 代码具备，待签名包实机验收 |
+| 离线资源 | Font Awesome、SheetJS、二维码已本地化，运行时会拒绝外部 CDN 引用 | 是（构建后需复核） |
+| 端口和常驻运行 | 自动避让占用端口，可固定端口；支持托盘、开机启动、异常自动重启 | 代码具备，待实机验收 |
+| 备份与换机迁移 | 支持快照恢复、完整 JSON 导出/导入、HTML 报表 | 代码具备，待干净环境验收 |
+| 代码签名 | 构建脚本支持 PFX 和 RFC3161 时间戳，但仓库未包含受信任证书 | **否，当前硬阻断** |
+| 自动更新 | 支持 Ed25519 签名清单、HTTPS 地址、SHA-256 和 Authenticode 双重校验 | 代码具备，需发布方准备 HTTPS 通道和密钥 |
+| 卸载与数据保留 | NSIS 标准卸载，默认保留用户业务数据 | 代码具备，待实机验收 |
+| 客户文档 | 安装、故障、备份换机、更新、许可和发布清单已放入 `docs/commercial/` | 是（需结合实际域名和客服信息最终定稿） |
+| 药典数据商业授权 | 上游整理数据只声明学习交流，正式服务需要正版出版物或数据授权 | **否，当前法律硬阻断** |
+
+结论：项目已具备路线 A 的大部分工程基础，但当前只能形成“未签名内部验收预览包”。只有同时完成代码签名、药典授权、干净 Windows 虚拟机安装/升级演练后，才能形成可正式推广的商业离线单机版。
 
 ---
 

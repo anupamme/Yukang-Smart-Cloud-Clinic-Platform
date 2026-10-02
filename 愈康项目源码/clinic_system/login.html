@@ -163,7 +163,9 @@ select.control{appearance:none;background-image:linear-gradient(45deg,transparen
   </section>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div><script>
-const savedServer = (localStorage.getItem('clinic_server_url') || window.location.origin || '').replace(/\/+$/, '');
+const currentOrigin = /^https?:$/.test(window.location.protocol) ? window.location.origin : '';
+const savedServer = (currentOrigin || localStorage.getItem('clinic_server_url') || 'http://localhost:3002').replace(/\/+$/, '');
+if (currentOrigin) localStorage.setItem('clinic_server_url', currentOrigin);
 let apiBase = (savedServer === 'null' || savedServer === 'file://' ? 'http://localhost:3002' : savedServer || 'http://localhost:3002') + '/api';
 const serverInput = document.getElementById('serverUrlInput');
 serverInput.value = apiBase.slice(0, -4);

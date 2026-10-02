@@ -17,6 +17,80 @@ permissions:
   contents: read
 
 jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install build dependencies
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+      - name: Install host Electron runtime
+        working-directory: desktop
+        run: npm run install:electron
+      - name: Resolve knowledge package
+        working-directory: desktop
+        shell: pwsh
+        env:
+          KNOWLEDGE_DOWNLOAD_URL: ${{ inputs.knowledge_download_url }}
+        run: |
+          if ($env:KNOWLEDGE_DOWNLOAD_URL) {
+            New-Item -ItemType Directory -Force -Path knowledge\full | Out-Null
+            Invoke-WebRequest -Uri $env:KNOWLEDGE_DOWNLOAD_URL -OutFile knowledge\knowledge-package.zip
+            Expand-Archive -LiteralPath knowledge\knowledge-package.zip -DestinationPath knowledge\full -Force
+            $db = Get-ChildItem -Path knowledge\full -Filter knowledge_index.db -Recurse -File | Select-Object -First 1
+            if (-not $db) { throw "压缩包中没有 knowledge_index.db" }
+            "YUKANG_KNOWLEDGE_DB=$($db.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            Write-Warning "未提供完整知识库，当前任务只生成未签名/精简预览包。"
+            "YUKANG_ALLOW_LITE_INDEX=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+      - name: Build Windows NSIS installer
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_TIMESTAMP_SERVER: http://timestamp.digicert.com
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+        run: npm run dist:win
+      - name: Smoke test Windows runtime
+        working-directory: desktop
+        run: npm run smoke:runtime
+      - name: Verify prepared runtime
+        working-directory: desktop
+        run: npm run verify:runtime
+      - name: Record Authenticode and SHA-256
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path artifacts -Filter 'YuKangClinic-Setup-*.exe' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) { throw "未找到 Windows 安装程序" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer.FullName
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash.ToLowerInvariant()
+          @(
+            "file=$($installer.FullName)",
+            "status=$($signature.Status)",
+            "status_message=$($signature.StatusMessage)",
+            "sha256=$hash",
+            "signature_required_for_public_release=true"
+          ) | Set-Content -Path artifacts\WINDOWS_RELEASE_STATUS.txt -Encoding utf8
+          if ($signature.Status -ne 'Valid') {
+            Write-Warning "CI 产物未签名，只能作为内部验收预览包，不能直接公开推广。"
+          }
+      - name: Upload Windows preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: yukang-windows-preview
+          path: |
+            desktop/artifacts/YuKangClinic-Setup-*.exe
+            desktop/artifacts/WINDOWS_RELEASE_STATUS.txt
+          if-no-files-found: error
   linux:
     runs-on: ubuntu-24.04
     steps:

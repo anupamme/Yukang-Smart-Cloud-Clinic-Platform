@@ -1,4 +1,5 @@
 const path = require('path');
+const packageJson = require('../../package.json');
 const repo = require('../repository/sqliteRepository');
 const HttpError = require('../errors/HttpError');
 const { indexStatus } = require('./hybridKnowledgeService');
@@ -24,7 +25,7 @@ async function exportJson(username) {
     return {
         format: 'yukang-clinic-export',
         formatVersion: 1,
-        appVersion: '5.0.0',
+        appVersion: packageJson.version,
         exportedAt: new Date().toISOString(),
         username,
         collections,

@@ -1,4 +1,4 @@
-const test = require('node:test');
+﻿const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
@@ -41,6 +41,6 @@ test('构建本地混合索引并返回向量相关结果', async () => {
         assert.equal(results.length, 2);
         assert.match(results[0].text, /咳嗽/);
     } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
 });

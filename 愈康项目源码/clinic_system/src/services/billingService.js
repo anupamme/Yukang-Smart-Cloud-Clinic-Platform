@@ -13,11 +13,28 @@ function makeBillNo() {
 function normalizePayment(body, amount) {
     const payMethod = String((body && body.payMethod) || '').trim();
     if (!PAY_METHODS.includes(payMethod)) throw new HttpError(400, '请选择有效的支付方式', 'INVALID_PAY_METHOD');
-    const receivedAmount = toNum(body && body.receivedAmount, NaN);
-    if (!Number.isFinite(receivedAmount) || receivedAmount < amount) {
-        throw new HttpError(400, '实收金额不能小于应收金额', 'INSUFFICIENT_RECEIVED_AMOUNT');
+
+    // 兼容旧客户端：老版本未传 actualAmount 时，仍按“标准应收全额收款”处理。
+    const actualAmount = body && body.actualAmount !== undefined ? toNum(body.actualAmount, NaN) : amount;
+    if (!Number.isFinite(actualAmount) || actualAmount < 0) {
+        throw new HttpError(400, '实际收费金额必须大于或等于 0', 'INVALID_ACTUAL_AMOUNT');
     }
-    return { payMethod, receivedAmount: +receivedAmount.toFixed(2), changeAmount: +(receivedAmount - amount).toFixed(2) };
+
+    const receivedAmount = body && body.receivedAmount !== undefined ? toNum(body.receivedAmount, NaN) : actualAmount;
+    if (!Number.isFinite(receivedAmount) || receivedAmount < actualAmount) {
+        throw new HttpError(400, '顾客付款金额不能小于实际收费金额', 'INSUFFICIENT_RECEIVED_AMOUNT');
+    }
+
+    const actual = +actualAmount.toFixed(2);
+    const received = +receivedAmount.toFixed(2);
+    return {
+        actualAmount: actual,
+        receivedAmount: received,
+        changeAmount: +(received - actual).toFixed(2),
+        discountAmount: +Math.max(0, amount - actual).toFixed(2),
+        adjustmentAmount: +(actual - amount).toFixed(2),
+        adjustmentReason: String((body && body.adjustmentReason) || '').trim().slice(0, 200)
+    };
 }
 
 async function createPendingBill(username, details = {}) {
@@ -64,6 +81,11 @@ async function payBillUnsafe(username, operator, id, body) {
         ...bill,
         status: 'paid',
         payMethod: payment.payMethod,
+        originalAmount: amount,
+        actualAmount: payment.actualAmount,
+        discountAmount: payment.discountAmount,
+        adjustmentAmount: payment.adjustmentAmount,
+        adjustmentReason: payment.adjustmentReason,
         receivedAmount: payment.receivedAmount,
         changeAmount: payment.changeAmount,
         operator,
@@ -77,7 +99,11 @@ async function payBillUnsafe(username, operator, id, body) {
     revenue.push({
         id: newId(),
         date: todayKey(),
-        amount,
+        amount: payment.actualAmount,
+        originalAmount: amount,
+        discountAmount: payment.discountAmount,
+        adjustmentAmount: payment.adjustmentAmount,
+        adjustmentReason: payment.adjustmentReason,
         desc: '门诊药品费',
         category: '门诊收费',
         payMethod: payment.payMethod,

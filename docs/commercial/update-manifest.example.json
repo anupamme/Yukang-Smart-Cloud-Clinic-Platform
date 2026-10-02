@@ -1,0 +1,7 @@
+{
+  "version": "5.1.1",
+  "downloadUrl": "https://download.example.com/yukang/YuKangClinic-Setup-5.1.1-x64.exe",
+  "sha256": "请填写安装包的64位小写SHA-256",
+  "signature": "请使用 sign-update.js 生成Ed25519签名",
+  "notes": "本次更新说明"
+}
