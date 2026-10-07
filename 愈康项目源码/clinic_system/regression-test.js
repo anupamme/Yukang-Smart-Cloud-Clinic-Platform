@@ -216,7 +216,7 @@ async function main() {
         // 7. 药品入库
         r = await req('POST', '/api/drug-inventory/stock-in', {
             token,
-            body: { drugName: '测试阿莫西林', qty: 100, unit: '盒', batchNo: 'B20260810', expiry: '2027/12/31', supplier: '测试供应商', cost: 8, price: 12.5 }
+            body: { drugName: '测试阿莫西林', qty: 100, unit: '盒', category: '西药', batchNo: 'B20260810', expiry: '2027/12/31', supplier: '测试供应商', cost: 8, price: 12.5 }
         });
         ok(r.status === 201, '药品入库成功', r.data);
 
@@ -256,7 +256,7 @@ async function main() {
         let ol = await req('GET', '/api/outpatients', { token });
         ok(ol.data.some(x => String(x.id) === String(opId) && x.status === '已就诊'), '门诊记录已更新');
         let rv = await req('GET', '/api/revenue', { token });
-        ok(rv.data.length === 1 && rv.data[0].billId === visitBillId && rv.data[0].payMethod === '现金', '支付后营收只写入一次并关联收费单');
+        ok(rv.data.length === 1 && rv.data[0].billId === visitBillId && rv.data[0].payMethod === '现金', '支付后营收只写入一次并关联收费单', { visitBillId, visitBillIdType: typeof visitBillId, revenueBillId: rv.data[0] && rv.data[0].billId, revenueBillIdType: typeof (rv.data[0] && rv.data[0].billId), revenue: rv.data });
         let ph = await req('GET', '/api/pharmacy', { token });
         const pharmaItem = ph.data.find(x => x.patient === '测试患者甲' && x.drug === '测试阿莫西林');
         ok(!!pharmaItem && pharmaItem.status === '待发药', '药房待发药记录存在');
@@ -343,7 +343,7 @@ async function main() {
         // 14.8 Excel 导入宽容性：缺列可导入，无名称行自动跳过
         r = await req('POST', '/api/drug-inventory/batch-import', {
             token,
-            body: { items: [{ name: '测试导入药品', stock: 5 }, { name: '', stock: 9 }] }
+            body: { items: [{ name: '测试导入药品', category: '其他商品', stock: 5 }, { name: '', stock: 9 }] }
         });
         ok(r.status === 200 && r.data && r.data.added === 1, '批量导入：缺列可导入，无名称行自动跳过', r.data);
 
@@ -419,7 +419,7 @@ async function main() {
         // 14.10 库存预警批量删除
         r = await req('POST', '/api/drug-inventory/stock-in', {
             token,
-            body: { drugName: '测试待删除药品', qty: 1, unit: '盒', batchNo: 'DEL1', price: 10, cost: 5 }
+            body: { drugName: '测试待删除药品', category: '其他商品', qty: 1, unit: '盒', batchNo: 'DEL1', price: 10, cost: 5 }
         });
         const delInv = (await req('GET', '/api/drugInventory', { token })).data.find(d => d.name === '测试待删除药品');
         ok(!!delInv && delInv.id, '库存预警测试药品已入库', delInv);

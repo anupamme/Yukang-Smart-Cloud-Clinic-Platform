@@ -68,12 +68,14 @@ test('v5 接诊只生成待收费，支付后仅写一次营收并记录补打',
         });
         assert.equal(paid.status, 200);
         assert.equal(paid.data.status, 'paid');
+        assert.equal(paid.data.payMethod, '现金');
         assert.equal(paid.data.receivedAmount, 30);
         assert.equal(paid.data.changeAmount, 5);
 
         const revenueAfterPay = await server.request('/api/revenue', { token: auth.token });
         assert.equal(revenueAfterPay.data.length, 1);
         assert.equal(revenueAfterPay.data[0].amount, 25);
+        assert.equal(revenueAfterPay.data[0].payMethod, '现金');
         assert.equal(revenueAfterPay.data[0].billId, visit.data.billId);
 
         const duplicate = await server.request(`/api/billing/${visit.data.billId}/pay`, {

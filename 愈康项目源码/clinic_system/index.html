@@ -1098,13 +1098,16 @@
                             <div class="pharmacy-toolbar">
                                 <select id="pharmacyCategoryFilter" class="server-input" style="width:140px;" onchange="setPharmacyCategory(this.value)" title="按药品类型筛选">
                                     <option value="all">全部类型</option>
-                                    <option value="中药饮品">中药饮品</option>
+                                    <option value="中药饮片">中药饮片</option>
                                     <option value="中成药">中成药</option>
                                     <option value="西药">西药</option>
-                                    <option value="中药颗粒">中药颗粒</option>
+                                    <option value="中药配方颗粒">中药配方颗粒</option>
                                     <option value="自制成品">自制成品</option>
                                     <option value="保健食品">保健食品</option>
-                                    <option value="unclassified">未归类（历史数据）</option>
+                                    <option value="医疗器械">医疗器械</option>
+                                    <option value="医用耗材">医用耗材</option>
+                                    <option value="其他商品">其他商品</option>
+                                    <option value="unclassified">未归类</option>
                                 </select>
                                 <input type="text" id="pharmacySearchInput" class="server-input" style="flex:1; min-width:220px; max-width:360px; margin-right:auto;" placeholder="搜索药品名称、编码、厂家、批号或供应商…" oninput="setPharmacySearch(this.value)">
                                 <input type="file" id="excelFileInput" accept=".xlsx, .xls">
@@ -1368,7 +1371,7 @@
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header"><h3>药品入库</h3><span style="cursor:pointer;" onclick="document.getElementById('modalStockIn').style.display='none'"><i class="fas fa-times"></i></span></div>
             <div class="modal-form-group"><label>药品名称</label><input type="text" id="si_drugName" placeholder="如：阿莫西林胶囊"></div>
-            <div class="modal-form-group"><label>药品类型（必填）</label><select id="si_category"><option value="">请选择药品类型</option><option>中药饮品</option><option>中成药</option><option>西药</option><option>中药颗粒</option><option>自制成品</option><option>保健食品</option></select></div>
+            <div class="modal-form-group"><label>药品类型（必填）</label><select id="si_category"><option value="">请选择药品类型</option><option>中药饮片</option><option>中成药</option><option>西药</option><option>中药配方颗粒</option><option>自制成品</option><option>保健食品</option><option>医疗器械</option><option>医用耗材</option><option>其他商品</option></select></div>
             <div style="display:flex; gap:10px;">
                 <div class="modal-form-group" style="flex:1;"><label>数量</label><input type="number" id="si_qty"></div>
                 <div class="modal-form-group" style="flex:1;"><label>单位</label><select id="si_unit" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;"><option>盒</option><option>瓶</option><option>袋</option><option>支</option></select></div>
@@ -1405,7 +1408,7 @@
             <div class="modal-header"><h3 id="kbModalTitle">新增药典条目</h3><span style="cursor:pointer;" onclick="document.getElementById('modalKB').style.display='none'"><i class="fas fa-times"></i></span></div>
             <div class="kb-field">
                 <label>药品名称（必填）</label><input type="text" id="kb_name">
-                <label>类别（如：西药 / 中成药 / 中药饮品）</label><input type="text" id="kb_category" placeholder="西药">
+                <label>类别（如：西药 / 中成药 / 中药饮片 / 中药配方颗粒）</label><input type="text" id="kb_category" placeholder="西药">
                 <label>功能 / 适应症</label><textarea id="kb_functions" rows="2"></textarea>
                 <label>用法用量</label><textarea id="kb_usage" rows="2"></textarea>
                 <label>禁忌</label><textarea id="kb_contraindications" rows="2"></textarea>
@@ -1536,7 +1539,7 @@
     let patientSearch = '', pharmacySearch = '', selectedPatientKey = null, kbEditId = null;
     let editingSavedVisit = false;
     let pharmacyCategory = 'all';
-    const PHARMACY_CATEGORIES = ['中药饮品', '中成药', '西药', '中药颗粒', '自制成品', '保健食品'];
+    const PHARMACY_CATEGORIES = ['中药饮片', '中成药', '西药', '中药配方颗粒', '自制成品', '保健食品', '医疗器械', '医用耗材', '其他商品'];
     let currentPeriod = 'today';
     let dashboardStats = null;
     let clinicSearch = '', clinicSearchTimer = null;
@@ -1921,7 +1924,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         const text = [d.category, d.drugClassZh, d.dosageForm, d.form, d.route, d.usage, d.functions,
             d.indications, d.notes, d.name].map(v => String(v || '')).join(' ');
         const category = String(d.category || '').trim();
-        if (['中药饮品', '中药饮片', '中药颗粒'].includes(category)) return 'herb';
+        if (['中药饮片', '中药配方颗粒'].includes(category)) return 'herb';
         if (/(注射液|注射用|静脉滴注|静脉注射|静滴|输液|溶媒|氯化钠注射液|葡萄糖注射液|皮试注射液)/i.test(text)) return 'infusion';
         if (/(外用|涂剂|涂膜剂|搽剂|洗剂|凝胶|栓剂|软膏|乳膏|药膏|霜|滴眼|滴鼻|滴耳|口腔喷|鼻腔喷|喷雾剂|喷雾型|含漱|灌肠|开塞露|消毒液|消毒酒精|清凉油|外治)/i.test(text)) return 'external';
         if (/(膏药|贴敷|敷贴|巴布膏|橡胶膏|硬膏|穴位贴|三伏贴|膏药贴|创口贴|退热贴|开胃贴|膏|贴|敷)/i.test(text)) return 'patch';
@@ -1943,7 +1946,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
         } catch (e) { console.error('药典库加载失败', e); }
         (dbDrugInventory || []).forEach(d => {
             const nm = String(d.name || '').trim(); if (!nm || seen[nm]) return; seen[nm] = 1;
-            if (!['中药饮品', '中药饮片', '中药颗粒'].includes(String(d.category || '').trim())) return;
+            if (!['中药饮片', '中药配方颗粒'].includes(String(d.category || '').trim())) return;
             merged.push({ name: nm, spec: d.spec || '', price: Number(d.price) || 0, source: '库存' });
         });
         rxHerbCache = merged;
@@ -4410,7 +4413,12 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
 
     function normalizedDrugCategory(drug) {
         const category = String(drug && drug.category || '').trim();
-        return category === '中药饮片' ? '中药饮品' : category;
+        const aliases = {
+            '中药饮品': '中药饮片',
+            '中药颗粒': '中药配方颗粒',
+            '未分类': '未归类'
+        };
+        return aliases[category] || category || '未归类';
     }
 
     function filteredDrugInventory() {
@@ -4460,7 +4468,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                 <td><b class="drug-name" data-drug-name="${esc(d.name)}">${esc(d.name)}</b></td>
                 <td>${esc(d.spec || '-')}</td>
                 <td>${esc(d.manufacturer || d.supplier || '-')}</td>
-                <td>${esc(d.category || '-')}</td>
+                <td>${esc(normalizedDrugCategory(d) || '-')}</td>
                 <td>¥${price.toFixed(2)}</td>
                 <td>¥${cost.toFixed(2)}</td>
                 <td style="color: ${stock <= 10 ? '#8a5a00' : '#237a45'}; font-weight:bold;">${stock} ${esc(d.unit || '盒')}</td>
@@ -4485,7 +4493,7 @@ pinyin_dict_firstletter.polyphone = {"19969":"DZ","19975":"WM","19988":"QJ","200
                 <td>${idx + 1}</td>
                 <td>${esc(d.code || '-')}</td>
                 <td><b class="drug-name" data-drug-name="${esc(d.name)}">${esc(d.name)}</b></td>
-                <td>${esc(d.category || '-')}</td>
+                <td>${esc(normalizedDrugCategory(d) || '-')}</td>
                 <td>${esc(specUnit)}</td>
                 <td>${esc(d.manufacturer || '-')}</td>
                 <td>${esc(d.approvalNo || '-')}</td>

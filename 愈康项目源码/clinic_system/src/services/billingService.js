@@ -28,6 +28,7 @@ function normalizePayment(body, amount) {
     const actual = +actualAmount.toFixed(2);
     const received = +receivedAmount.toFixed(2);
     return {
+        payMethod,
         actualAmount: actual,
         receivedAmount: received,
         changeAmount: +(received - actual).toFixed(2),

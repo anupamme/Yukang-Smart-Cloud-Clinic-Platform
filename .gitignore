@@ -22,6 +22,9 @@ node_modules/
 # ---- 药典2025原始整理数据（21MB 素材，仅用于重新生成知识库，不入库）----
 药典2025原始数据/
 
+# ---- 药品分类审计与迁移临时文件，不提交本地结果 ----
+**/*.category-backup.json
+**/*.classification-audit.json
 # ---- 日志与系统临时文件 ----
 *.log
 npm-debug.log*
